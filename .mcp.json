@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["dlx", "shadcn@latest", "mcp"]
+    },
+    "coloop-docs": {
+      "type": "http",
+      "url": "https://docs.coloop.ai/mcp"
+    }
+  }
+}
