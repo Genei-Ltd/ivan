@@ -45,11 +45,12 @@ export default function Home() {
           Ivan
         </span>
         <h1 className="text-3xl font-bold tracking-tight">
-          What do you want to change?
+          Change production. Break nothing.
         </h1>
-        <p className="text-muted-foreground">
-          Describe it. Ivan edits the repo on a fresh branch, you watch it live,
-          then ship a PR.
+        <p className="text-muted-foreground max-w-md text-balance">
+          Describe a change in plain English. Ivan makes it on a full-data fork
+          of production, proves it works, then opens a PR. No customer is ever
+          at risk.
         </p>
       </div>
 
@@ -66,7 +67,7 @@ export default function Home() {
                 void start()
               }
             }}
-            placeholder="e.g. Make the hero headline bigger and add a discount banner"
+            placeholder="e.g. Checkout is slow, find out why and fix it"
             rows={2}
             disabled={starting}
             className="max-h-48 min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
