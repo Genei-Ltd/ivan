@@ -25,18 +25,26 @@ export function createSession(prompt: string): Session {
   const env = getEnv()
   const id = randomUUID()
   const branch = branchNameFromPrompt(prompt)
+  const firstMessage = {
+    id: randomUUID(),
+    role: 'user' as const,
+    content: prompt,
+  }
   const session: Session = {
     id,
     status: 'creating',
     repoUrl: env.TARGET_REPO_URL,
     baseBranch: env.TARGET_REPO_BRANCH,
     branch,
-    messages: [{ id: randomUUID(), role: 'user', content: prompt }],
+    messages: [firstMessage],
     logs: [],
     createdAt: new Date().toISOString(),
   }
   createSessionRecord(session)
   emit(id, { kind: 'status', status: 'creating' })
+  // Buffer the first user message as an event so late SSE subscribers replay it.
+  // It is already in session.messages, so emit() updates in place (no dupe).
+  setMessage(id, firstMessage)
 
   void provisionAndRun(id, prompt)
   return session
