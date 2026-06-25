@@ -1,14 +1,22 @@
 import { createSlackAdapter } from '@chat-adapter/slack'
 import { createMemoryState } from '@chat-adapter/state-memory'
+import { createPostgresState } from '@chat-adapter/state-pg'
 import { Chat, type Message, type Thread } from 'chat'
+import { createPostgresPool, postgresConnectionString } from '@/lib/postgres'
 import { createSession, sendMessage } from '@/lib/shell/manager'
-import { getSession } from '@/lib/shell/store'
+import {
+  ensureSessionLoaded,
+  waitForSessionPersistence,
+} from '@/lib/shell/store'
 import type { Session, SessionStatus } from '@/lib/shell/types'
 import { normalizeKnownSlackMentions } from '@/lib/slack/mentions'
 
 interface SlackThreadState {
   ivanSessionId?: string
 }
+
+type SlackAdapter = ReturnType<typeof createSlackAdapter>
+type IvanBot = Chat<{ slack: SlackAdapter }, SlackThreadState>
 
 const BUSY_STATUSES = new Set<SessionStatus>([
   'creating',
@@ -33,6 +41,15 @@ function workspaceUrl(sessionId: string): string | undefined {
 function sessionLink(sessionId: string): string {
   const url = workspaceUrl(sessionId)
   return url ? `[Open Ivan workspace](${url})` : `Ivan session: ${sessionId}`
+}
+
+function createStateAdapter() {
+  return postgresConnectionString()
+    ? createPostgresState({
+        client: createPostgresPool({ max: 2 }),
+        keyPrefix: 'ivan-slack',
+      })
+    : createMemoryState()
 }
 
 function statusMessage(status: SessionStatus): string {
@@ -60,7 +77,8 @@ async function startIvanSession(
   thread: Thread<SlackThreadState>,
   prompt: string,
 ): Promise<Session> {
-  const session = createSession(prompt)
+  const session = createSession(prompt, [], { slackThreadId: thread.id })
+  await waitForSessionPersistence(session.id)
   await thread.setState({ ivanSessionId: session.id }, { replace: true })
   await thread.subscribe()
   return session
@@ -78,7 +96,7 @@ async function handleIvanInput(
 
   const state = await thread.state
   const existingSession = state?.ivanSessionId
-    ? getSession(state.ivanSessionId)
+    ? await ensureSessionLoaded(state.ivanSessionId)
     : undefined
 
   if (!existingSession) {
@@ -111,14 +129,30 @@ async function handleIvanInput(
   )
 }
 
-export const bot = new Chat({
-  userName: 'ivan',
-  adapters: {
-    slack: createSlackAdapter(),
-  },
-  state: createMemoryState(),
-})
+const globalForBot = globalThis as unknown as {
+  __ivanSlackBot?: IvanBot
+}
 
-bot.onNewMention(handleIvanInput)
-bot.onDirectMessage(handleIvanInput)
-bot.onSubscribedMessage(handleIvanInput)
+export function getBot(): IvanBot {
+  if (globalForBot.__ivanSlackBot) {
+    return globalForBot.__ivanSlackBot
+  }
+
+  const adapters = {
+    slack: createSlackAdapter(),
+  }
+
+  const bot = new Chat<typeof adapters, SlackThreadState>({
+    userName: 'ivan',
+    adapters,
+    state: createStateAdapter(),
+    dedupeTtlMs: 10 * 60 * 1000,
+  })
+
+  bot.onNewMention(handleIvanInput)
+  bot.onDirectMessage(handleIvanInput)
+  bot.onSubscribedMessage(handleIvanInput)
+
+  globalForBot.__ivanSlackBot = bot
+  return bot
+}

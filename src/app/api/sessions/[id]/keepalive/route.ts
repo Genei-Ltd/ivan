@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/shell/store'
+import { ensureSessionLoaded } from '@/lib/shell/store'
 import { keepSessionAlive } from '@/lib/shell/manager'
 
 export const runtime = 'nodejs'
@@ -12,7 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  if (!getSession(id)) {
+  if (!(await ensureSessionLoaded(id))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
 

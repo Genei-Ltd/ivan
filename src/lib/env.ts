@@ -23,8 +23,8 @@ const schema = z.object({
   SANDBOX_VERCEL_PROJECT_ID: z.string().min(1),
   SANDBOX_VERCEL_TOKEN: z.string().min(1),
 
-  // Injected into the sandbox so full-stack changes and migrations run against
-  // a real Postgres. Optional until Phase 4.
+  // Durable Ivan session/Slack state, also injected into the sandbox so
+  // full-stack changes and migrations run against a real Postgres.
   DATABASE_URL: z.string().optional(),
 
   // Aiven API token. Gives the in-sandbox agent the Aiven MCP server (via

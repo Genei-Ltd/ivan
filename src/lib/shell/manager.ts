@@ -4,10 +4,10 @@ import type { Session } from './types'
 import {
   createSessionRecord,
   emit,
+  ensureSessionLoaded,
   getClaudeSessionId,
   getKeepAliveDeadline,
   getSandbox,
-  getSession,
   setClaudeSessionId,
   setKeepAliveDeadline,
   setMessage,
@@ -26,12 +26,19 @@ import {
   type UploadedImageAttachment,
 } from './attachments'
 
+interface CreateSessionOptions {
+  slackThreadId?: string
+}
+
+const resumePromises = new Map<string, Promise<void>>()
+
 // Kick off a new session: record it, surface the first user message, and start
 // provisioning + the initial agent turn in the background. Returns immediately
 // so the client can navigate to the workspace and subscribe to events.
 export function createSession(
   prompt: string,
   attachments: UploadedImageAttachment[] = [],
+  options: CreateSessionOptions = {},
 ): Session {
   const env = getEnv()
   const id = randomUUID()
@@ -52,9 +59,11 @@ export function createSession(
     baseBranch: env.TARGET_REPO_BRANCH,
     branch,
     sandboxName,
+    slackThreadId: options.slackThreadId,
     messages: [firstMessage],
     logs: [],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
   createSessionRecord(session)
   storeImageAttachments(id, attachments)
@@ -73,7 +82,7 @@ async function provisionAndRun(
   attachments: UploadedImageAttachment[],
 ): Promise<void> {
   const logger = createSessionLogger(id)
-  const session = getSession(id)
+  const session = await ensureSessionLoaded(id)
   if (!session) {
     return
   }
@@ -105,10 +114,30 @@ async function provisionAndRun(
 }
 
 export async function resumeSession(id: string): Promise<void> {
+  const existing = resumePromises.get(id)
+  if (existing) {
+    await existing
+    return
+  }
+
+  const promise = resumeSessionOnce(id)
+  resumePromises.set(id, promise)
+  try {
+    await promise
+  } finally {
+    resumePromises.delete(id)
+  }
+}
+
+async function resumeSessionOnce(id: string): Promise<void> {
   const logger = createSessionLogger(id)
-  const session = getSession(id)
+  const session = await ensureSessionLoaded(id)
   if (!session) {
     throw new Error('Session not found')
+  }
+
+  if (session.status === 'resuming') {
+    return
   }
 
   const sandboxName = session.sandboxName ?? getSandbox(id)?.name
@@ -143,6 +172,35 @@ export async function resumeSession(id: string): Promise<void> {
   emit(id, { kind: 'status', status: 'ready' })
 }
 
+export async function maybeAutoResumeSession(id: string): Promise<void> {
+  const session = await ensureSessionLoaded(id)
+  if (!session || getSandbox(id)) {
+    return
+  }
+  if (
+    session.status === 'creating' ||
+    session.status === 'working' ||
+    session.status === 'submitting'
+  ) {
+    return
+  }
+  if (!session.sandboxName || session.status === 'submitted' || session.prUrl) {
+    return
+  }
+  if (session.status === 'resuming') {
+    return
+  }
+
+  void resumeSession(id).catch((error: unknown) => {
+    emit(id, {
+      kind: 'error',
+      message:
+        error instanceof Error ? error.message : 'Failed to resume session',
+    })
+    emit(id, { kind: 'status', status: 'error' })
+  })
+}
+
 // Run one agent turn against the session's sandbox, streaming the assistant
 // message as it is produced.
 async function runAgentTurn(
@@ -152,7 +210,11 @@ async function runAgentTurn(
 ): Promise<void> {
   const env = getEnv()
   const logger = createSessionLogger(id)
-  const sandbox = getSandbox(id)
+  let sandbox = getSandbox(id)
+  if (!sandbox) {
+    await resumeSession(id)
+    sandbox = getSandbox(id)
+  }
   if (!sandbox) {
     emit(id, { kind: 'error', message: 'No active sandbox for session' })
     emit(id, { kind: 'status', status: 'error' })
@@ -204,7 +266,7 @@ export async function sendMessage(
   content: string,
   attachments: UploadedImageAttachment[] = [],
 ): Promise<void> {
-  const session = getSession(id)
+  const session = await ensureSessionLoaded(id)
   if (!session) {
     throw new Error('Session not found')
   }
@@ -223,10 +285,19 @@ export async function sendMessage(
 // Commit, push, and open a PR from the session branch.
 export async function submitSession(id: string): Promise<void> {
   const logger = createSessionLogger(id)
-  const session = getSession(id)
-  const sandbox = getSandbox(id)
-  if (!session || !sandbox) {
+  const session = await ensureSessionLoaded(id)
+  let sandbox = getSandbox(id)
+  if (!session) {
     throw new Error('Session not found')
+  }
+  if (!sandbox) {
+    await resumeSession(id)
+    sandbox = getSandbox(id)
+  }
+  if (!sandbox) {
+    emit(id, { kind: 'error', message: 'No active sandbox for session' })
+    emit(id, { kind: 'status', status: 'error' })
+    return
   }
 
   emit(id, { kind: 'status', status: 'submitting' })
@@ -290,7 +361,7 @@ export async function keepSessionAlive(id: string): Promise<void> {
     return
   }
 
-  const session = getSession(id)
+  const session = await ensureSessionLoaded(id)
   const startedAt = session ? Date.parse(session.createdAt) : Date.now()
   const maxDeadline = startedAt + MAX_SANDBOX_LIFETIME_MS
 
@@ -310,6 +381,7 @@ export async function keepSessionAlive(id: string): Promise<void> {
 
 // Stop the sandbox and mark the session stopped.
 export async function teardownSession(id: string): Promise<void> {
+  await ensureSessionLoaded(id)
   const sandbox = getSandbox(id)
   if (sandbox) {
     try {

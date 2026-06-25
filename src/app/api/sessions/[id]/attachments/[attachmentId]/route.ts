@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getImageAttachment, getSession } from '@/lib/shell/store'
+import {
+  ensureImageAttachmentLoaded,
+  ensureSessionLoaded,
+} from '@/lib/shell/store'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,11 +16,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string; attachmentId: string }> },
 ) {
   const { id, attachmentId } = await params
-  if (!getSession(id)) {
+  if (!(await ensureSessionLoaded(id))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
 
-  const attachment = getImageAttachment(id, attachmentId)
+  const attachment = await ensureImageAttachmentLoaded(id, attachmentId)
   if (!attachment) {
     return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
   }

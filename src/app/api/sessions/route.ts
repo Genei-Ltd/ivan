@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSession } from '@/lib/shell/manager'
-import { listSessions } from '@/lib/shell/store'
+import { listAllSessions, waitForSessionPersistence } from '@/lib/shell/store'
 import { parseAgentRequest } from '@/lib/shell/request'
 
 export const runtime = 'nodejs'
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const session = createSession(parsed.content, parsed.attachments)
+    await waitForSessionPersistence(session.id)
     return NextResponse.json({ id: session.id }, { status: 201 })
   } catch (error: unknown) {
     return NextResponse.json(
@@ -26,6 +27,6 @@ export async function POST(request: Request) {
   }
 }
 
-export function GET() {
-  return NextResponse.json({ sessions: listSessions() })
+export async function GET() {
+  return NextResponse.json({ sessions: await listAllSessions() })
 }

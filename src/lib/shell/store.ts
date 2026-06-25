@@ -2,14 +2,18 @@ import { EventEmitter } from 'node:events'
 import type { Sandbox } from '@vercel/sandbox'
 import type { ChatMessage, LogEntry, Session, ShellEvent } from './types'
 import type { UploadedImageAttachment } from './attachments'
+import {
+  listPersistedSessions,
+  loadImageAttachment,
+  loadSession as loadPersistedSession,
+  saveClaudeSessionId,
+  saveImageAttachments,
+  saveSessionSnapshot,
+} from './persistence'
 
-// In-memory session store with a per-session event bus. Replaces the
-// template's Postgres persistence. Suitable for an internal, single-process
-// deployment (next dev / next start), not horizontally scaled serverless.
-//
-// A ring buffer of events per session lets a late SSE subscriber replay history
-// on connect. Live Sandbox handles and the Claude chat session id are kept in a
-// separate non-serialisable runtime map.
+// In-memory runtime store with a per-session event bus. Durable metadata is
+// snapshotted to Postgres when DATABASE_URL is present; live Sandbox handles
+// stay in this non-serialisable runtime map.
 
 interface Runtime {
   session: Session
@@ -25,6 +29,13 @@ interface Runtime {
 }
 
 const MAX_BUFFER = 10000
+const RUNTIME_BOUND_STATUSES = new Set([
+  'creating',
+  'resuming',
+  'ready',
+  'working',
+  'submitting',
+])
 
 // Survive HMR in dev by hanging the map off globalThis.
 const globalForStore = globalThis as unknown as {
@@ -34,25 +45,156 @@ const runtimes: Map<string, Runtime> =
   globalForStore.__shellRuntimes ??
   (globalForStore.__shellRuntimes = new Map<string, Runtime>())
 
-export function createSessionRecord(session: Session): void {
+const persistChain = new Map<string, Promise<void>>()
+
+function cloneMessage(message: ChatMessage): ChatMessage {
+  return {
+    ...message,
+    attachments: message.attachments?.map((attachment) => ({ ...attachment })),
+    parts: message.parts?.map((part) => ({ ...part })),
+  }
+}
+
+function cloneSession(session: Session): Session {
+  return {
+    ...session,
+    messages: session.messages.map(cloneMessage),
+    logs: session.logs.map((log) => ({ ...log })),
+  }
+}
+
+function sessionHistory(session: Session): ShellEvent[] {
+  const history: ShellEvent[] = [
+    { kind: 'status', status: session.status },
+    ...session.messages.map(
+      (message): ShellEvent => ({ kind: 'message', message }),
+    ),
+    ...session.logs.map((entry): ShellEvent => ({ kind: 'log', entry })),
+  ]
+
+  if (session.previewUrl) {
+    history.push({ kind: 'preview', url: session.previewUrl })
+  }
+  if (session.prUrl) {
+    history.push({ kind: 'pr', url: session.prUrl })
+  }
+  if (session.error) {
+    history.push({ kind: 'error', message: session.error })
+  }
+
+  return history
+}
+
+function queuePersist(runtime: Runtime): Promise<void> {
+  const snapshot = cloneSession(runtime.session)
+  const claudeSessionId = runtime.claudeSessionId
+  const previous = persistChain.get(snapshot.id) ?? Promise.resolve()
+  const next = previous
+    .catch(() => undefined)
+    .then(() => saveSessionSnapshot(snapshot, claudeSessionId))
+  const queued = next.finally(() => {
+    if (persistChain.get(snapshot.id) === queued) {
+      persistChain.delete(snapshot.id)
+    }
+  })
+
+  persistChain.set(snapshot.id, queued)
+  void next.catch(() => undefined)
+  return queued
+}
+
+function restoredSession(session: Session): Session {
+  if (session.prUrl || session.status === 'submitted') {
+    return session
+  }
+
+  if (!RUNTIME_BOUND_STATUSES.has(session.status)) {
+    return session
+  }
+
+  return {
+    ...session,
+    status: 'stopped',
+    logs: [
+      ...session.logs,
+      {
+        type: 'info',
+        message:
+          'Session restored from storage; reconnecting the sandbox before continuing.',
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  }
+}
+
+export function createSessionRecord(
+  session: Session,
+  options: { seedHistory?: boolean; persist?: boolean } = {},
+): void {
   const emitter = new EventEmitter()
   emitter.setMaxListeners(0)
+  const sessionRecord = cloneSession(session)
   runtimes.set(session.id, {
-    session,
+    session: sessionRecord,
     emitter,
-    buffer: [],
+    buffer: options.seedHistory ? sessionHistory(sessionRecord) : [],
     attachments: new Map(),
   })
+  if (options.persist ?? true) {
+    const runtime = runtimes.get(session.id)
+    if (runtime) {
+      void queuePersist(runtime)
+    }
+  }
 }
 
 export function getSession(id: string): Session | undefined {
   return runtimes.get(id)?.session
 }
 
+export async function ensureSessionLoaded(
+  id: string,
+): Promise<Session | undefined> {
+  const existing = getSession(id)
+  if (existing) {
+    return existing
+  }
+
+  const persisted = await loadPersistedSession(id)
+  if (!persisted) {
+    return undefined
+  }
+
+  const session = restoredSession(persisted.session)
+  createSessionRecord(session, { seedHistory: true, persist: false })
+  const runtime = runtimes.get(id)
+  if (runtime) {
+    runtime.claudeSessionId = persisted.claudeSessionId
+  }
+  return runtime?.session
+}
+
 export function listSessions(): Session[] {
   return [...runtimes.values()]
     .map((r) => r.session)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function listAllSessions(): Promise<Session[]> {
+  const sessions = new Map<string, Session>()
+  for (const session of await listPersistedSessions()) {
+    sessions.set(session.id, session)
+  }
+  for (const session of listSessions()) {
+    sessions.set(session.id, session)
+  }
+  return [...sessions.values()].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  )
+}
+
+export async function waitForSessionPersistence(id: string): Promise<void> {
+  await (persistChain.get(id) ?? Promise.resolve())
 }
 
 export function getSandbox(id: string): Sandbox | undefined {
@@ -70,6 +212,8 @@ export function setSandboxName(id: string, sandboxName: string): void {
   const r = runtimes.get(id)
   if (r) {
     r.session.sandboxName = sandboxName
+    r.session.updatedAt = new Date().toISOString()
+    void queuePersist(r)
   }
 }
 
@@ -92,6 +236,8 @@ export function setClaudeSessionId(id: string, claudeSessionId: string): void {
   const r = runtimes.get(id)
   if (r) {
     r.claudeSessionId = claudeSessionId
+    void saveClaudeSessionId(id, claudeSessionId).catch(() => undefined)
+    void queuePersist(r)
   }
 }
 
@@ -107,6 +253,12 @@ export function storeImageAttachments(
   for (const attachment of attachments) {
     r.attachments.set(attachment.id, attachment)
   }
+
+  const afterSessionSnapshot = persistChain.get(id) ?? Promise.resolve()
+  void afterSessionSnapshot
+    .catch(() => undefined)
+    .then(() => saveImageAttachments(id, attachments))
+    .catch(() => undefined)
 }
 
 export function getImageAttachment(
@@ -115,6 +267,25 @@ export function getImageAttachment(
 ): UploadedImageAttachment | undefined {
   const r = runtimes.get(id)
   return r?.attachments?.get(attachmentId)
+}
+
+export async function ensureImageAttachmentLoaded(
+  id: string,
+  attachmentId: string,
+): Promise<UploadedImageAttachment | undefined> {
+  await ensureSessionLoaded(id)
+  const existing = getImageAttachment(id, attachmentId)
+  if (existing) {
+    return existing
+  }
+
+  const attachment = await loadImageAttachment(id, attachmentId)
+  const r = runtimes.get(id)
+  if (attachment && r) {
+    r.attachments ??= new Map()
+    r.attachments.set(attachment.id, attachment)
+  }
+  return attachment
 }
 
 // Emit an event: persist any state it implies onto the session, buffer it for
@@ -159,11 +330,13 @@ export function emit(id: string, event: ShellEvent): void {
       break
   }
 
+  r.session.updatedAt = new Date().toISOString()
   r.buffer.push(event)
   if (r.buffer.length > MAX_BUFFER) {
     r.buffer.shift()
   }
   r.emitter.emit('event', event)
+  void queuePersist(r)
 }
 
 // Subscribe to a session's events. Returns buffered history plus an unsubscribe.

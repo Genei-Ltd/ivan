@@ -1,5 +1,5 @@
-// Core types for Ivan. Sessions are held in memory and authenticated with env
-// tokens (no database, no per-user auth).
+// Core types for Ivan. Live runtime handles stay in memory, while session
+// metadata can be persisted so workspaces survive redeploys/cold starts.
 
 export type LogType = 'info' | 'command' | 'error' | 'success'
 
@@ -83,9 +83,11 @@ export interface Session {
   previewUrl?: string
   prUrl?: string
   error?: string
+  slackThreadId?: string
   messages: ChatMessage[]
   logs: LogEntry[]
   createdAt: string
+  updatedAt?: string
 }
 
 // Result shapes returned by the sandbox engine.

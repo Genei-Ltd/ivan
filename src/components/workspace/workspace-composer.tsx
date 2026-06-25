@@ -33,9 +33,9 @@ export function WorkspaceComposer({
   onSend: () => void
   onSubmit: () => void
 }) {
-  const sendingLocked = busy || posting
-  const canSend = !sendingLocked && Boolean(input.trim())
   const canResume = status === 'stopped' || status === 'error'
+  const sendingLocked = busy || posting || canResume
+  const canSend = !sendingLocked && Boolean(input.trim())
 
   return (
     <div className="p-4">
@@ -50,11 +50,12 @@ export function WorkspaceComposer({
       >
         <PendingImageAttachments
           attachments={imageAttachments.attachments}
-          disabled={busy || posting}
+          disabled={sendingLocked}
           onRemove={imageAttachments.removeAttachment}
         />
         <Textarea
           value={input}
+          disabled={canResume}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             onInputChange(event.target.value)
           }}
@@ -81,7 +82,7 @@ export function WorkspaceComposer({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <ImageAttachmentPicker
-              disabled={busy || posting}
+              disabled={sendingLocked}
               onFiles={imageAttachments.addFiles}
             />
             {prUrl ? (

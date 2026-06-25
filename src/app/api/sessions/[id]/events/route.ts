@@ -1,4 +1,5 @@
-import { subscribe } from '@/lib/shell/store'
+import { maybeAutoResumeSession } from '@/lib/shell/manager'
+import { ensureSessionLoaded, subscribe } from '@/lib/shell/store'
 import type { ShellEvent } from '@/lib/shell/types'
 
 export const runtime = 'nodejs'
@@ -12,6 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
+  const session = await ensureSessionLoaded(id)
   const encoder = new TextEncoder()
 
   let ping: ReturnType<typeof setInterval> | undefined
@@ -31,7 +33,7 @@ export async function GET(
         }
       }
 
-      const sub = subscribe(id, send)
+      const sub = session ? subscribe(id, send) : undefined
       if (!sub) {
         controller.enqueue(encoder.encode('event: notfound\ndata: {}\n\n'))
         controller.close()
@@ -50,6 +52,8 @@ export async function GET(
           // controller closed
         }
       }, 15000)
+
+      void maybeAutoResumeSession(id)
     },
     cancel() {
       if (ping) {

@@ -58,10 +58,15 @@ export function WorkspacePreview({
         ) : (
           <div className="flex h-full min-h-0 flex-col items-center gap-3 overflow-hidden p-8">
             <div className="flex shrink-0 flex-col items-center gap-3">
-              <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
+              {canResume ? (
+                <RotateCcwIcon className="text-muted-foreground size-6" />
+              ) : (
+                <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
+              )}
               <p className="text-muted-foreground text-sm">
-                {STATUS_LABEL[status]}… the preview appears once the dev server
-                is up.
+                {canResume
+                  ? 'Reconnect the sandbox to continue this workspace.'
+                  : `${STATUS_LABEL[status]}… the preview appears once the dev server is up.`}
               </p>
               {canResume && (
                 <Button onClick={onResume} disabled={resumeDisabled}>

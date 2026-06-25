@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/shell/store'
+import { ensureSessionLoaded } from '@/lib/shell/store'
 import { teardownSession } from '@/lib/shell/manager'
 
 export const runtime = 'nodejs'
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  const session = getSession(id)
+  const session = await ensureSessionLoaded(id)
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
@@ -22,7 +22,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  if (!getSession(id)) {
+  if (!(await ensureSessionLoaded(id))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
   await teardownSession(id)

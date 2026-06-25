@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/shell/store'
+import { ensureSessionLoaded } from '@/lib/shell/store'
 import { sendMessage } from '@/lib/shell/manager'
 import { parseAgentRequest } from '@/lib/shell/request'
 
@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  if (!getSession(id)) {
+  if (!(await ensureSessionLoaded(id))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
 

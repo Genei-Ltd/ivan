@@ -4,26 +4,27 @@ A modern, batteries-included Next.js template designed to get you into the flow 
 
 ## Ivan
 
-Ivan (a play on Aiven) is a self-hostable, Lovable-style shell: describe a change in plain English and Ivan edits a locked template repo on a fresh branch inside a Vercel Sandbox, you watch the result live in an iframe, then ship a PR. It runs in-process, with in-memory sessions and env-based tokens, so there's no database or per-user auth to stand up.
+Ivan (a play on Aiven) is a self-hostable, Lovable-style shell: describe a change in plain English and Ivan edits a locked template repo on a fresh branch inside a Vercel Sandbox, you watch the result live in an iframe, then ship a PR. Live sandbox handles run in-process, while `DATABASE_URL` gives Ivan durable session, log, message, attachment, and Slack thread state across redeploys and cold starts.
 
 ### How it works
 
 - `src/lib/shell/` — the engine: provision a sandbox, clone the target repo, install deps + the Claude Code CLI, start `next dev` on an exposed port, run the agent (stream-json), commit/push, open the PR.
 - `src/lib/shell/claude-skills/` — Ivan-owned Claude Code skills copied into the sandbox as `~/.claude/skills/*` before each agent run.
-- `src/lib/shell/store.ts` — in-memory sessions + a per-session SSE event bus.
+- `src/lib/shell/store.ts` — runtime session handles + a per-session SSE event bus, backed by Postgres snapshots when `DATABASE_URL` is set.
+- `src/lib/shell/persistence.ts` — Postgres tables for sessions, logs, messages, image attachments, Claude resume ids, and Slack thread ids.
 - `src/app/api/sessions/**` — create / list / event-stream / message / resume / submit.
 - `src/app/page.tsx` + `src/app/workspace/[id]` — launcher and the chat-plus-live-preview workspace.
 
-The agent runs **inside** the sandbox (the same model as a local coding agent), so its secrets live in the sandbox. Suitable for an internal, single-process deployment.
+The agent runs **inside** the sandbox (the same model as a local coding agent), so its editing secrets live in the sandbox. Production deployments should set `DATABASE_URL` so Ivan can restore workspace links after Vercel redeploys or instance swaps.
 
 ### Running it
 
-1. Copy `.env.example` to `.env` and fill it in (Anthropic key, target repo, GitHub token, Vercel Sandbox credentials).
+1. Copy `.env.example` to `.env` and fill it in (Anthropic key, target repo, GitHub token, Vercel Sandbox credentials, and `DATABASE_URL` for durable sessions).
 2. `pnpm dev`, open the app, describe a change, and watch the preview.
 
 ### Slack input
 
-Slack messages use the same Ivan session flow as the app text box, via Chat SDK's official Slack adapter.
+Slack messages use the same Ivan session flow as the app text box, via Chat SDK's official Slack adapter. When `DATABASE_URL` is set, Chat SDK also stores Slack subscriptions, locks, and webhook dedupe in Postgres so Slack retries do not create duplicate sessions.
 
 1. Set `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Set `IVAN_APP_URL` to your deployed app URL if you want Slack replies to link to the workspace.
 2. In Slack, set the Events API request URL to `https://your-domain.com/api/webhooks/slack`.
@@ -40,7 +41,7 @@ Before booting a Next 16 target app, Ivan also adds the sandbox preview host to 
 
 Those runtime preview config edits are marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
 
-Ivan creates named persistent Vercel Sandboxes for new sessions. If a sandbox stops, the workspace can reattach by name and restart the dev server while the Ivan session record still exists in memory.
+Ivan creates named persistent Vercel Sandboxes for new sessions. If a sandbox or serverless process stops, the workspace restores the session from Postgres, reattaches by sandbox name, and restarts the dev server.
 
 ## What's Included
 
