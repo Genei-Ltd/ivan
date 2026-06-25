@@ -65,11 +65,11 @@ export function PendingImageAttachments({
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto px-1 pb-1">
+    <div className="flex gap-2 overflow-x-auto px-1 pt-1 pb-2">
       {attachments.map((attachment, index) => (
         <div
           key={attachment.id}
-          className="group/image relative size-16 shrink-0"
+          className="relative size-24 shrink-0 sm:size-28"
           title={`${attachment.file.name || `Image ${String(index + 1)}`} · ${formatBytes(
             attachment.file.size,
           )}`}
@@ -77,7 +77,7 @@ export function PendingImageAttachments({
           <div
             aria-label={attachment.file.name || `Image ${String(index + 1)}`}
             role="img"
-            className="bg-muted size-full rounded-lg border bg-cover bg-center"
+            className="bg-muted size-full rounded-2xl border bg-cover bg-center shadow-sm"
             style={{ backgroundImage: imageBackground(attachment.url) }}
           />
           <button
@@ -85,8 +85,8 @@ export function PendingImageAttachments({
             disabled={disabled}
             aria-label="Remove image"
             className={cn(
-              'bg-background text-foreground absolute -top-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full border shadow-sm',
-              'opacity-100 transition-opacity md:opacity-0 md:group-hover/image:opacity-100',
+              'bg-background/95 text-foreground absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm',
+              'transition-colors hover:bg-background disabled:opacity-50',
             )}
             onClick={() => {
               onRemove(attachment.id)

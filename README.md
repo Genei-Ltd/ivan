@@ -35,9 +35,9 @@ Mention Ivan in a Slack thread or DM it directly. The first message creates an I
 
 Next.js 16 defaults to Turbopack, whose HMR can be unreliable behind the sandbox proxy, so `src/lib/shell/creation.ts` starts sandboxed dev servers with `--webpack`. Ivan's own dev server allowlists hosts from `IVAN_APP_URL`, `NEXT_PUBLIC_APP_URL`, and `IVAN_ALLOWED_DEV_ORIGINS` so it can run behind ngrok or another tunnel.
 
-Before booting a Next 16 target app, Ivan also adds the sandbox preview host to that app's `allowedDevOrigins` so `/_next` dev resources can load from the public `sb-*.vercel.run` iframe.
+Before booting a Next 16 target app, Ivan also adds the sandbox preview host to that app's `allowedDevOrigins` so `/_next` dev resources can load from the public `sb-*.vercel.run` iframe, and injects `devIndicators: false` so the preview iframe does not show Next's development indicator.
 
-That runtime allowlist edit is marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
+Those runtime preview config edits are marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
 
 ## What's Included
 

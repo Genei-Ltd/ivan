@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
   // Configure Turbopack-specific options here if needed:
   // turbopack: {},
 
+  devIndicators: false,
+
   // React Compiler: automatic memoization, no manual React.memo/useMemo needed
   reactCompiler: true,
 

@@ -10,7 +10,7 @@ function hostnameFromUrl(url: string): string | undefined {
   }
 }
 
-async function clearRuntimeNextDevOrigin(
+async function clearRuntimeNextPreviewConfig(
   sandbox: Sandbox,
   previewUrl: string | undefined,
   logger: SessionLogger,
@@ -21,8 +21,9 @@ async function clearRuntimeNextDevOrigin(
   }
 
   // `creation.ts` patches the target config so Next dev accepts the sandbox
-  // iframe host. Before committing, remove only that host and clear the git
-  // assume-unchanged bit so genuine agent edits to next.config.* are visible.
+  // iframe host and hides Next's dev indicator. Before committing, remove only
+  // those runtime markers and clear the git assume-unchanged bit so genuine
+  // agent edits to next.config.* are visible.
   const script = `
 const fs = require('node:fs')
 const { execFileSync } = require('node:child_process')
@@ -54,6 +55,10 @@ next = next.replace(
   /^[ \\t]*allowedDevOrigins:\\s*\\[\\s*\\],\\s*\\/\\/ Ivan runtime dev origin\\n/m,
   '',
 )
+next = next.replace(
+  /^[ \\t]*devIndicators:\\s*false,\\s*\\/\\/ Ivan runtime dev indicators\\n/m,
+  '',
+)
 if (next !== source) {
   fs.writeFileSync(file, next)
 }
@@ -73,11 +78,11 @@ if (next !== source) {
   ])
 
   if (result.output?.trim() === 'removed') {
-    await logger.info('Removed runtime Next dev origin allowlist')
+    await logger.info('Removed runtime Next preview config')
   }
   if (!result.success && result.exitCode !== 2) {
     await logger.error(
-      'Could not clean runtime Next dev origin allowlist before commit',
+      'Could not clean runtime Next preview config before commit',
     )
     return false
   }
@@ -93,12 +98,12 @@ export async function pushChangesToBranch(
   logger: SessionLogger,
   previewUrl?: string,
 ): Promise<{ success: boolean; pushed: boolean; error?: string }> {
-  const clean = await clearRuntimeNextDevOrigin(sandbox, previewUrl, logger)
+  const clean = await clearRuntimeNextPreviewConfig(sandbox, previewUrl, logger)
   if (!clean) {
     return {
       success: false,
       pushed: false,
-      error: 'Failed to clean runtime Next dev origin allowlist',
+      error: 'Failed to clean runtime Next preview config',
     }
   }
 

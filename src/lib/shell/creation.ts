@@ -184,7 +184,7 @@ export async function createSandbox(
     await logger.info(`Created branch ${branch}`)
 
     // The preview URL is needed before `next dev` starts so the target app can
-    // allowlist the public sandbox host for dev resources.
+    // accept the public sandbox host and hide dev-only browser chrome.
     const domain = sandbox.domain(env.SANDBOX_DEV_PORT)
     await startDevServer(sandbox, packageManager, domain, logger)
 
@@ -229,7 +229,7 @@ async function startDevServer(
     // Next 16 blocks HMR/dev asset requests when the app is viewed from the
     // sandbox's public iframe host. Patch the cloned target app's config before
     // booting its dev server; Ivan's own config cannot affect that process.
-    await configureNextDevOrigin(sandbox, previewUrl, logger)
+    await configureNextSandboxPreview(sandbox, previewUrl, logger)
   }
 
   // Bind explicitly to 0.0.0.0 and the exposed port so the sandbox proxy can
@@ -299,7 +299,7 @@ function hostnameFromUrl(url: string): string | undefined {
   }
 }
 
-async function configureNextDevOrigin(
+async function configureNextSandboxPreview(
   sandbox: Sandbox,
   previewUrl: string,
   logger: SessionLogger,
@@ -311,7 +311,8 @@ async function configureNextDevOrigin(
 
   // This support patch is intentionally best-effort. If the target config has a
   // shape we cannot edit safely, the preview still loads, but HMR may log the
-  // cross-origin warning until the app config is adjusted manually.
+  // cross-origin warning or show Next's dev indicator until the app config is
+  // adjusted manually.
   const script = `
 const fs = require('node:fs')
 const { execFileSync } = require('node:child_process')
@@ -327,43 +328,76 @@ const file = candidates.find((candidate) => fs.existsSync(candidate))
 if (!file) {
   process.exit(2)
 }
-let source = fs.readFileSync(file, 'utf8')
-if (source.includes(host)) {
-  process.exit(0)
-}
+const source = fs.readFileSync(file, 'utf8')
 let next = source
-if (/allowedDevOrigins\\s*:\\s*\\[/.test(next)) {
-  next = next.replace(
-    /allowedDevOrigins\\s*:\\s*\\[/,
-    (match) => match + JSON.stringify(host) + ', ',
-  )
-} else if (/const\\s+nextConfig[^=]*=\\s*\\{/.test(next)) {
-  next = next.replace(
-    /(const\\s+nextConfig[^=]*=\\s*)\\{/,
-    '$1{\\n  allowedDevOrigins: [' +
+
+function insertConfigProperty(value, property) {
+  if (/const\\s+nextConfig[^=]*=\\s*\\{/.test(value)) {
+    return value.replace(
+      /(const\\s+nextConfig[^=]*=\\s*)\\{/,
+      '$1{\\n  ' + property,
+    )
+  }
+  if (/module\\.exports\\s*=\\s*\\{/.test(value)) {
+    return value.replace(
+      /(module\\.exports\\s*=\\s*)\\{/,
+      '$1{\\n  ' + property,
+    )
+  }
+  if (/export\\s+default\\s+\\{/.test(value)) {
+    return value.replace(
+      /(export\\s+default\\s*)\\{/,
+      '$1{\\n  ' + property,
+    )
+  }
+}
+
+function withAllowedDevOrigin(value) {
+  if (value.includes(host)) {
+    return value
+  }
+  if (/allowedDevOrigins\\s*:\\s*\\[/.test(value)) {
+    return value.replace(
+      /allowedDevOrigins\\s*:\\s*\\[/,
+      (match) => match + JSON.stringify(host) + ', ',
+    )
+  }
+  return insertConfigProperty(
+    value,
+    'allowedDevOrigins: [' +
       JSON.stringify(host) +
       '], // Ivan runtime dev origin',
   )
-} else if (/module\\.exports\\s*=\\s*\\{/.test(next)) {
-  next = next.replace(
-    /(module\\.exports\\s*=\\s*)\\{/,
-    '$1{\\n  allowedDevOrigins: [' +
-      JSON.stringify(host) +
-      '], // Ivan runtime dev origin',
+}
+
+function withDisabledDevIndicators(value) {
+  if (/devIndicators\\s*:/.test(value)) {
+    return value
+  }
+  return insertConfigProperty(
+    value,
+    'devIndicators: false, // Ivan runtime dev indicators',
   )
-} else if (/export\\s+default\\s+\\{/.test(next)) {
-  next = next.replace(
-    /(export\\s+default\\s*)\\{/,
-    '$1{\\n  allowedDevOrigins: [' +
-      JSON.stringify(host) +
-      '], // Ivan runtime dev origin',
-  )
-} else {
+}
+
+const withOrigin = withAllowedDevOrigin(next)
+if (!withOrigin) {
   process.exit(3)
+}
+next = withOrigin
+
+const withIndicators = withDisabledDevIndicators(next)
+if (!withIndicators) {
+  process.exit(3)
+}
+next = withIndicators
+
+if (next === source) {
+  process.exit(0)
 }
 fs.writeFileSync(file, next)
 try {
-  // Hide the runtime-only allowlist until submit-time cleanup removes it.
+  // Hide runtime-only preview config edits until submit-time cleanup removes them.
   execFileSync('git', ['update-index', '--assume-unchanged', file], {
     stdio: 'ignore',
   })
@@ -376,17 +410,17 @@ try {
   ])
 
   if (result.success) {
-    await logger.info(`Allowed Next dev origin ${host}`)
+    await logger.info(`Configured Next sandbox preview for ${host}`)
     return
   }
 
   if (result.exitCode === 2) {
-    await logger.info('No Next config found; skipping dev origin allowlist')
+    await logger.info('No Next config found; skipping sandbox preview config')
     return
   }
 
   await logger.error(
-    'Could not update Next dev origin allowlist; preview HMR may warn about cross-origin requests',
+    'Could not update Next sandbox preview config; preview may show dev chrome or warn about cross-origin requests',
   )
 }
 
