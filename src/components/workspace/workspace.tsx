@@ -211,7 +211,11 @@ export function Workspace({ id }: { id: string }) {
                 setInput(event.target.value)
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                if (
+                  event.key === 'Enter' &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
                   event.preventDefault()
                   void send()
                 }
