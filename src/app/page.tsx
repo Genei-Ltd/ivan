@@ -54,7 +54,7 @@ export default function Home() {
       </div>
 
       <div className="w-full max-w-xl">
-        <div className="bg-card focus-within:border-ring/60 flex w-full flex-col gap-2 rounded-2xl border p-2.5 shadow-sm transition-colors">
+        <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
           <Textarea
             value={prompt}
             onChange={(event) => {
@@ -67,18 +67,16 @@ export default function Home() {
               }
             }}
             placeholder="e.g. Make the hero headline bigger and add a discount banner"
-            rows={4}
+            rows={2}
             disabled={starting}
-            className="max-h-72 min-h-24 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+            className="max-h-48 min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground hidden px-1 text-xs sm:block">
-              ⌘↵ to start
-            </span>
+          <div className="flex items-center justify-end gap-2">
             <Button
+              size="sm"
+              className="rounded-full"
               onClick={() => void start()}
               disabled={starting || !prompt.trim()}
-              className="rounded-full"
             >
               {starting ? (
                 <Loader2Icon className="size-4 animate-spin" />
