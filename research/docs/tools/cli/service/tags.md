@@ -23,7 +23,7 @@ avn service tags list kafka-demo
 
 ```text
 KEY      VALUE
-========  ===================
+=======  ===================
 team     frontend
 scope    userclicks-tracking
 ```

@@ -121,7 +121,7 @@ export function Workspace({ id }: { id: string }) {
   return (
     <div className="flex h-svh flex-col md:flex-row">
       {/* Left: chat + activity */}
-      <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-md md:border-r md:border-b-0">
+      <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-112 md:border-r md:border-b-0">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
           <Link href="/" className="text-sm font-semibold">
             Ivan
