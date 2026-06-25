@@ -156,8 +156,16 @@ export async function createSandbox(
     await installPsql(sandbox, logger)
 
     // Git identity + session branch.
-    await runInProject(sandbox, 'git', ['config', 'user.name', 'Lovable Shell'])
-    await runInProject(sandbox, 'git', ['config', 'user.email', 'shell@local'])
+    await runInProject(sandbox, 'git', [
+      'config',
+      'user.name',
+      'Ivan The Great',
+    ])
+    await runInProject(sandbox, 'git', [
+      'config',
+      'user.email',
+      'ivan@aiven.io',
+    ])
     const createBranch = await runInProject(sandbox, 'git', [
       'checkout',
       '-b',
