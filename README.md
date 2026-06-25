@@ -20,6 +20,17 @@ The agent runs **inside** the sandbox (the same model as a local coding agent), 
 1. Copy `.env.example` to `.env` and fill it in (Anthropic key, target repo, GitHub token, Vercel Sandbox credentials).
 2. `pnpm dev`, open the app, describe a change, and watch the preview.
 
+### Slack input
+
+Slack messages use the same Ivan session flow as the app text box, via Chat SDK's official Slack adapter.
+
+1. Set `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Set `IVAN_APP_URL` to your deployed app URL if you want Slack replies to link to the workspace.
+2. In Slack, set the Events API request URL to `https://your-domain.com/api/webhooks/slack`.
+3. Add bot scopes for the surfaces you want: `chat:write`, `app_mentions:read`, `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `mpim:history`, and `mpim:read`.
+4. Subscribe to `app_mention`, `message.channels`, `message.groups`, `message.im`, and `message.mpim`.
+
+Mention Ivan in a Slack thread or DM it directly. The first message creates an Ivan workspace session; later Slack messages in that same thread are sent to the same session.
+
 ### Known caveat (validate first)
 
 Next.js 16 defaults to Turbopack, whose HMR can be unreliable behind the sandbox proxy, so `src/lib/shell/creation.ts` starts the dev server with `--webpack`. Whether hot reload survives the public sandbox URL inside a cross-origin iframe is the one assumption worth validating before relying on it.

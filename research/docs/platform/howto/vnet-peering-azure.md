@@ -180,7 +180,7 @@ permissions to do so.
 created must in the local tenant`, which means your account doesn't have the required
      permissions. See [Prerequisites](/docs/platform/howto/vnet-peering-azure#prerequisites).
    - `The service principal cannot be created, updated, or restored because the service
-  principal name 55f300d4-fc50-4c5e-9222-e90a6e2187fb is already in use`, in which case
+principal name 55f300d4-fc50-4c5e-9222-e90a6e2187fb is already in use`, in which case
      run `az ad sp show --id 55f300d4-fc50-4c5e-9222-e90a6e2187fb` and find `id` in the
      output.
      :::
