@@ -18,7 +18,7 @@ interface Runtime {
   claudeSessionId?: string
 }
 
-const MAX_BUFFER = 1000
+const MAX_BUFFER = 10000
 
 // Survive HMR in dev by hanging the map off globalThis.
 const globalForStore = globalThis as unknown as {

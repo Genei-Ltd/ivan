@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Markdown from 'react-markdown'
 import {
   ExternalLinkIcon,
   GitPullRequestIcon,
@@ -14,6 +13,7 @@ import { toast } from 'sonner'
 import { useSessionStream } from '@/hooks/use-session-stream'
 import type { SessionStatus } from '@/lib/shell/types'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/workspace/markdown'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -121,8 +121,8 @@ export function Workspace({ id }: { id: string }) {
   return (
     <div className="flex h-svh flex-col md:flex-row">
       {/* Left: chat + activity */}
-      <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-105 md:border-r md:border-b-0">
-        <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+      <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-md md:border-r md:border-b-0">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
           <Link href="/" className="text-sm font-semibold">
             Ivan
           </Link>
@@ -136,27 +136,27 @@ export function Workspace({ id }: { id: string }) {
           </div>
         </header>
 
-        <ScrollArea className="min-h-0 flex-1 px-4">
-          <div className="flex flex-col gap-4 py-4">
-            {state.messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'rounded-lg px-3 py-2 text-sm',
-                  message.role === 'user'
-                    ? 'bg-muted ml-6'
-                    : 'bg-card border mr-6',
-                )}
-              >
-                {message.content ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none wrap-break-word">
-                    <Markdown>{message.content}</Markdown>
+        <ScrollArea className="min-h-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:block!">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
+            {state.messages.map((message) =>
+              message.role === 'user' ? (
+                <div key={message.id} className="flex justify-end">
+                  <div className="bg-muted text-foreground w-fit max-w-[85%] rounded-3xl px-4 py-2.5 text-sm">
+                    <Markdown small withBreaks>
+                      {message.content}
+                    </Markdown>
                   </div>
-                ) : (
-                  <Loader2Icon className="text-muted-foreground size-4 animate-spin" />
-                )}
-              </div>
-            ))}
+                </div>
+              ) : (
+                <div key={message.id} className="group/message w-full min-w-0">
+                  {message.content ? (
+                    <Markdown small>{message.content}</Markdown>
+                  ) : (
+                    <Loader2Icon className="text-muted-foreground size-4 animate-spin" />
+                  )}
+                </div>
+              ),
+            )}
             {state.error && (
               <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
                 {state.error}
@@ -203,56 +203,66 @@ export function Workspace({ id }: { id: string }) {
         <Separator />
 
         {/* Composer */}
-        <div className="flex flex-col gap-2 p-3">
-          <Textarea
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault()
-                void send()
-              }
-            }}
-            placeholder="Describe a change…"
-            rows={3}
-            disabled={busy}
-          />
-          <div className="flex items-center justify-between gap-2">
-            {state.prUrl ? (
-              <Button asChild variant="outline" size="sm">
-                <a href={state.prUrl} target="_blank" rel="noreferrer">
+        <div className="p-4">
+          <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
+            <Textarea
+              value={input}
+              onChange={(event) => {
+                setInput(event.target.value)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault()
+                  void send()
+                }
+              }}
+              placeholder="Describe a change…"
+              rows={2}
+              disabled={busy}
+              className="min-h-12 max-h-48 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {state.prUrl ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                >
+                  <a href={state.prUrl} target="_blank" rel="noreferrer">
+                    <GitPullRequestIcon className="size-4" />
+                    View PR
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => void submit()}
+                  disabled={busy || posting || state.status === 'connecting'}
+                >
                   <GitPullRequestIcon className="size-4" />
-                  View PR
-                </a>
-              </Button>
-            ) : (
+                  Open PR
+                </Button>
+              )}
               <Button
-                variant="outline"
                 size="sm"
-                onClick={() => void submit()}
-                disabled={busy || posting || state.status === 'connecting'}
+                className="rounded-full"
+                onClick={() => void send()}
+                disabled={busy || posting || !input.trim()}
               >
-                <GitPullRequestIcon className="size-4" />
-                Open PR
+                <SendIcon className="size-4" />
+                Send
               </Button>
-            )}
-            <Button
-              size="sm"
-              onClick={() => void send()}
-              disabled={busy || posting || !input.trim()}
-            >
-              <SendIcon className="size-4" />
-              Send
-            </Button>
+            </div>
           </div>
         </div>
       </aside>
 
       {/* Right: live preview */}
       <main className="relative flex h-1/2 flex-1 flex-col md:h-full">
-        <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
           <span className="text-sm font-medium">Preview</span>
           {state.previewUrl && (
             <Button asChild variant="ghost" size="sm">

@@ -27,6 +27,14 @@ const schema = z.object({
   // a real Postgres. Optional until Phase 4.
   DATABASE_URL: z.string().optional(),
 
+  // Aiven API token. Gives the in-sandbox agent the Aiven MCP server (via
+  // `npx mcp-aiven`) so it can provision and inspect Aiven services live.
+  // Create one in the Aiven Console; needs org-level "Allow MCP connection".
+  AIVEN_TOKEN: z.string().min(1),
+  // Restrict the MCP to non-destructive operations. Defaults to write access
+  // (false) so the agent can actually create services.
+  AIVEN_READ_ONLY: z.enum(['true', 'false']).default('false'),
+
   SANDBOX_DEV_PORT: z.coerce.number().int().positive().default(3000),
   SANDBOX_TIMEOUT_MS: z.coerce
     .number()

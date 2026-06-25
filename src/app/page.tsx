@@ -45,42 +45,49 @@ export default function Home() {
           Ivan
         </span>
         <h1 className="text-3xl font-bold tracking-tight">
-          What do you want to change?
+          Change production. Break nothing.
         </h1>
-        <p className="text-muted-foreground">
-          Describe it. Ivan edits the repo on a fresh branch, you watch it live,
-          then ship a PR.
+        <p className="text-muted-foreground max-w-2xl text-balance">
+          Describe a change in plain English. Ivan makes it on a full-data fork
+          of production, proves it works, then opens a PR. No customer is ever
+          at risk.
         </p>
       </div>
 
-      <div className="flex w-full max-w-xl flex-col gap-3">
-        <Textarea
-          value={prompt}
-          onChange={(event) => {
-            setPrompt(event.target.value)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault()
-              void start()
-            }
-          }}
-          placeholder="e.g. Make the hero headline bigger and add a discount banner"
-          rows={4}
-          disabled={starting}
-        />
-        <Button
-          onClick={() => void start()}
-          disabled={starting || !prompt.trim()}
-          className="self-end"
-        >
-          {starting ? (
-            <Loader2Icon className="size-4 animate-spin" />
-          ) : (
-            <SparklesIcon className="size-4" />
-          )}
-          Start building
-        </Button>
+      <div className="w-full max-w-2xl">
+        <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
+          <Textarea
+            value={prompt}
+            onChange={(event) => {
+              setPrompt(event.target.value)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault()
+                void start()
+              }
+            }}
+            placeholder="e.g. Checkout is slow, find out why and fix it"
+            rows={2}
+            disabled={starting}
+            className="max-h-48 min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              className="rounded-full"
+              onClick={() => void start()}
+              disabled={starting || !prompt.trim()}
+            >
+              {starting ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <SparklesIcon className="size-4" />
+              )}
+              Start building
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Toaster />

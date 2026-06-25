@@ -1,3 +1,5 @@
+import { Agentation } from 'agentation'
+
 import type { Metadata } from 'next'
 import { fontVariables } from '@/lib/fonts'
 import { ThemeProvider } from '@/providers/theme-provider'
@@ -18,17 +20,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={fontVariables}>
-      <body className="typography-editorial min-h-svh antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <MotionProvider>{children}</MotionProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <>
+      <html lang="en" suppressHydrationWarning className={fontVariables}>
+        <body className="typography-dense min-h-svh antialiased">
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <MotionProvider>{children}</MotionProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+      {process.env.NODE_ENV === 'development' && <Agentation />}
+    </>
   )
 }

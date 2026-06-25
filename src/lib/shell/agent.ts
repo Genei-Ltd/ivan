@@ -11,6 +11,11 @@ export interface RunClaudeOptions {
   // Pass the previous Claude chat session id to continue the conversation in a
   // kept-alive sandbox (multi-turn chat).
   resumeSessionId?: string
+  // When set, the Aiven MCP server is registered for this run so the agent can
+  // provision and inspect Aiven services. The token is passed via env (never
+  // argv or the config string) and the MCP child inherits it.
+  aivenToken?: string
+  aivenReadOnly?: boolean
   logger: SessionLogger
   // Called with the full accumulated assistant content on every update, so the
   // caller can upsert the streaming chat message.
@@ -56,6 +61,8 @@ export async function executeClaudeInSandbox(
     apiKey,
     baseUrl,
     resumeSessionId,
+    aivenToken,
+    aivenReadOnly,
     logger,
     onAssistantContent,
   } = opts
@@ -80,9 +87,6 @@ export async function executeClaudeInSandbox(
     flags.push(`--resume "${resumeSessionId}"`)
   }
 
-  // Prompt arrives via $AGENT_PROMPT so quotes/newlines can't break the shell.
-  const command = `claude ${flags.join(' ')} -- "$AGENT_PROMPT"`
-
   const env: Record<string, string> = {
     ANTHROPIC_API_KEY: apiKey,
     AGENT_PROMPT: instruction,
@@ -90,6 +94,22 @@ export async function executeClaudeInSandbox(
   if (baseUrl) {
     env.ANTHROPIC_BASE_URL = baseUrl
   }
+
+  // Register the Aiven MCP server for this run. The config carries no secret
+  // (so it's safe to pass inline via env), and the spawned `mcp-aiven` process
+  // inherits AIVEN_TOKEN / AIVEN_READ_ONLY from the agent's environment. Merged
+  // with the target repo's own .mcp.json rather than replacing it.
+  if (aivenToken) {
+    env.AIVEN_MCP_CONFIG = JSON.stringify({
+      mcpServers: { aiven: { command: 'npx', args: ['-y', 'mcp-aiven'] } },
+    })
+    env.AIVEN_TOKEN = aivenToken
+    env.AIVEN_READ_ONLY = aivenReadOnly ? 'true' : 'false'
+    flags.push('--mcp-config "$AIVEN_MCP_CONFIG"')
+  }
+
+  // Prompt arrives via $AGENT_PROMPT so quotes/newlines can't break the shell.
+  const command = `claude ${flags.join(' ')} -- "$AGENT_PROMPT"`
 
   await logger.command(`claude ${flags.join(' ')} -- "<prompt>"`)
 

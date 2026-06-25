@@ -1,0 +1,66 @@
+---
+title: Manage Aiven for PostgreSQL® extensions
+sidebar_label: Manage extensions
+---
+
+Aiven for PostgreSQL® allows a series of pre-approved extensions to be installed.
+
+:::note[Who can manage extensions]
+All database users can manage extensions: both the default `avnadmin` user and other
+database users created via the Aiven Console, API, CLI, or Aiven Provider for Terraform.
+This is the expected behavior because of the extension whitelist configuration in
+Aiven for PostgreSQL.
+:::
+
+## Install an extension
+
+To install an extension, run:
+
+```sql
+CREATE EXTENSION EXTENSION_NAME CASCADE;
+```
+
+## Update an extension
+
+To upgrade an already-installed extension to the latest version, run:
+
+```sql
+ALTER EXTENSION EXTENSION_NAME UPDATE;
+```
+
+To experiment with upgrading, remember that you can fork
+your existing database to try this operation on a copy rather than your
+live database.
+
+:::warning
+When a service is updated via a maintenance update, this does not update
+the extension versions that are used automatically. The reason for this
+is that user schemas and functions can (and do often) rely on specific
+versions of an extension being used, so we can't assume that all
+extensions are safe to upgrade.
+:::
+
+## Delete an extension
+
+To delete an extension, run:
+
+```sql
+DROP EXTENSION EXTENSION_NAME;
+```
+
+## Request a new extension
+
+We are always open to suggestions of additional extensions that can be
+useful to many of our customers, and there are a few that can be enabled
+on request if you need them. For any extensions not on the
+[list of approved extensions](/docs/products/postgresql/reference/list-of-extensions),
+make a request through [Aiven Ideas](https://ideas.aiven.io/). Be sure to include:
+
+- Which extension is requested
+- Which database service and user database should have them
+
+:::warning
+"Untrusted" language extensions such as `plpythonu` cannot be
+supported as they would compromise our ability to guarantee the highest
+possible service level.
+:::
