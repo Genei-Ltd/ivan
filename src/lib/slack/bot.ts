@@ -4,6 +4,7 @@ import { Chat, type Message, type Thread } from 'chat'
 import { createSession, sendMessage } from '@/lib/shell/manager'
 import { getSession } from '@/lib/shell/store'
 import type { Session, SessionStatus } from '@/lib/shell/types'
+import { normalizeKnownSlackMentions } from '@/lib/slack/mentions'
 
 interface SlackThreadState {
   ivanSessionId?: string
@@ -66,7 +67,7 @@ async function handleIvanInput(
   thread: Thread<SlackThreadState>,
   message: Message,
 ): Promise<void> {
-  const content = message.text.trim()
+  const content = normalizeKnownSlackMentions(message.text).trim()
   if (!content) {
     await thread.post('Send a change request and I will pass it to Ivan.')
     return

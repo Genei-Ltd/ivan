@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { ChatMessage, ToolCallPart } from '@/lib/shell/types'
 import { cn } from '@/lib/utils'
+import { normalizeKnownSlackMentions } from '@/lib/slack/mentions'
 import { MessageImageAttachments } from '@/components/workspace/image-attachments'
 import { Markdown } from '@/components/workspace/markdown'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -164,6 +165,7 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
 
 function UserMessage({ message }: { message: ChatMessage }) {
   const hasImageAttachments = Boolean(message.attachments?.length)
+  const content = normalizeKnownSlackMentions(message.content)
 
   return (
     <div className="flex justify-end">
@@ -174,7 +176,7 @@ function UserMessage({ message }: { message: ChatMessage }) {
         )}
       >
         <Markdown small withBreaks>
-          {message.content}
+          {content}
         </Markdown>
         <MessageImageAttachments attachments={message.attachments} />
       </div>
