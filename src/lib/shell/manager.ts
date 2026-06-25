@@ -97,6 +97,8 @@ async function runAgentTurn(id: string, instruction: string): Promise<void> {
     apiKey: env.ANTHROPIC_API_KEY,
     baseUrl: env.ANTHROPIC_BASE_URL,
     resumeSessionId: getClaudeSessionId(id),
+    aivenToken: env.AIVEN_TOKEN,
+    aivenReadOnly: env.AIVEN_READ_ONLY === 'true',
     logger,
     onAssistantContent: (content) => {
       setMessage(id, { id: assistantId, role: 'assistant', content })
