@@ -155,7 +155,13 @@ export async function submitSession(id: string): Promise<void> {
     session.messages.find((m) => m.role === 'user')?.content ?? 'Update'
   const title = firstPrompt.slice(0, 72)
 
-  const push = await pushChangesToBranch(sandbox, session.branch, title, logger)
+  const push = await pushChangesToBranch(
+    sandbox,
+    session.branch,
+    title,
+    logger,
+    session.previewUrl,
+  )
   if (!push.success) {
     emit(id, { kind: 'error', message: push.error ?? 'Push failed' })
     emit(id, { kind: 'status', status: 'error' })

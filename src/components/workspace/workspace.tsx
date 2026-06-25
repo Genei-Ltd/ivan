@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ChevronRightIcon,
@@ -213,6 +213,7 @@ export function Workspace({ id }: { id: string }) {
   const [input, setInput] = useState('')
   const [posting, setPosting] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
   // Keep the sandbox alive while this workspace is open. Heartbeat every 2
   // minutes, well inside the server's 5-minute keepalive window, so a missed
@@ -228,6 +229,24 @@ export function Workspace({ id }: { id: string }) {
       clearInterval(interval)
     }
   }, [id])
+
+  useEffect(() => {
+    if (!showLogs) {
+      return
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const reducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches
+      logEndRef.current?.scrollIntoView({
+        block: 'end',
+        behavior: reducedMotion ? 'auto' : 'smooth',
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+    }
+  }, [showLogs, state.logs.length])
 
   const busy =
     state.status === 'creating' ||
@@ -357,9 +376,9 @@ export function Workspace({ id }: { id: string }) {
               <div className="space-y-0.5 px-4 py-2 font-mono text-xs">
                 {state.logs.map((log, index) => (
                   <div
-                    key={index}
+                    key={`${log.timestamp}-${String(index)}`}
                     className={cn(
-                      'wrap-break-word whitespace-pre-wrap',
+                      'animate-log-entry wrap-break-word whitespace-pre-wrap',
                       log.type === 'error' && 'text-destructive',
                       log.type === 'command' && 'text-foreground',
                       log.type === 'success' &&
@@ -370,6 +389,7 @@ export function Workspace({ id }: { id: string }) {
                     {log.message}
                   </div>
                 ))}
+                <div ref={logEndRef} aria-hidden="true" />
               </div>
             </ScrollArea>
           )}

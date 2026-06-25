@@ -180,10 +180,11 @@ export async function createSandbox(
     }
     await logger.info(`Created branch ${branch}`)
 
-    // Start the dev server on the exposed port.
-    await startDevServer(sandbox, packageManager, logger)
-
+    // The preview URL is needed before `next dev` starts so the target app can
+    // allowlist the public sandbox host for dev resources.
     const domain = sandbox.domain(env.SANDBOX_DEV_PORT)
+    await startDevServer(sandbox, packageManager, domain, logger)
+
     await logger.success('Preview is live')
     return { success: true, sandbox, domain, branchName: branch }
   } catch (error: unknown) {
@@ -198,6 +199,7 @@ export async function createSandbox(
 async function startDevServer(
   sandbox: Sandbox,
   packageManager: PackageManager,
+  previewUrl: string,
   logger: SessionLogger,
 ): Promise<void> {
   const env = getEnv()
@@ -218,6 +220,13 @@ async function startDevServer(
     } catch {
       // ignore unparseable package.json
     }
+  }
+
+  if (isNext16) {
+    // Next 16 blocks HMR/dev asset requests when the app is viewed from the
+    // sandbox's public iframe host. Patch the cloned target app's config before
+    // booting its dev server; Ivan's own config cannot affect that process.
+    await configureNextDevOrigin(sandbox, previewUrl, logger)
   }
 
   // Bind explicitly to 0.0.0.0 and the exposed port so the sandbox proxy can
@@ -277,6 +286,105 @@ async function startDevServer(
       'Dev server did not start listening in time; the preview may 502 until it finishes compiling',
     )
   }
+}
+
+function hostnameFromUrl(url: string): string | undefined {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url.replace(/^https?:\/\//, '').split('/')[0]
+  }
+}
+
+async function configureNextDevOrigin(
+  sandbox: Sandbox,
+  previewUrl: string,
+  logger: SessionLogger,
+): Promise<void> {
+  const host = hostnameFromUrl(previewUrl)
+  if (!host) {
+    return
+  }
+
+  // This support patch is intentionally best-effort. If the target config has a
+  // shape we cannot edit safely, the preview still loads, but HMR may log the
+  // cross-origin warning until the app config is adjusted manually.
+  const script = `
+const fs = require('node:fs')
+const { execFileSync } = require('node:child_process')
+const host = ${JSON.stringify(host)}
+const candidates = [
+  'next.config.ts',
+  'next.config.mts',
+  'next.config.js',
+  'next.config.mjs',
+  'next.config.cjs',
+]
+const file = candidates.find((candidate) => fs.existsSync(candidate))
+if (!file) {
+  process.exit(2)
+}
+let source = fs.readFileSync(file, 'utf8')
+if (source.includes(host)) {
+  process.exit(0)
+}
+let next = source
+if (/allowedDevOrigins\\s*:\\s*\\[/.test(next)) {
+  next = next.replace(
+    /allowedDevOrigins\\s*:\\s*\\[/,
+    (match) => match + JSON.stringify(host) + ', ',
+  )
+} else if (/const\\s+nextConfig[^=]*=\\s*\\{/.test(next)) {
+  next = next.replace(
+    /(const\\s+nextConfig[^=]*=\\s*)\\{/,
+    '$1{\\n  allowedDevOrigins: [' +
+      JSON.stringify(host) +
+      '], // Ivan runtime dev origin',
+  )
+} else if (/module\\.exports\\s*=\\s*\\{/.test(next)) {
+  next = next.replace(
+    /(module\\.exports\\s*=\\s*)\\{/,
+    '$1{\\n  allowedDevOrigins: [' +
+      JSON.stringify(host) +
+      '], // Ivan runtime dev origin',
+  )
+} else if (/export\\s+default\\s+\\{/.test(next)) {
+  next = next.replace(
+    /(export\\s+default\\s*)\\{/,
+    '$1{\\n  allowedDevOrigins: [' +
+      JSON.stringify(host) +
+      '], // Ivan runtime dev origin',
+  )
+} else {
+  process.exit(3)
+}
+fs.writeFileSync(file, next)
+try {
+  // Hide the runtime-only allowlist until submit-time cleanup removes it.
+  execFileSync('git', ['update-index', '--assume-unchanged', file], {
+    stdio: 'ignore',
+  })
+} catch {}
+`
+
+  const result = await runCommandInSandbox(sandbox, 'sh', [
+    '-c',
+    `cd ${PROJECT_DIR} && node <<'NODE'\n${script}\nNODE`,
+  ])
+
+  if (result.success) {
+    await logger.info(`Allowed Next dev origin ${host}`)
+    return
+  }
+
+  if (result.exitCode === 2) {
+    await logger.info('No Next config found; skipping dev origin allowlist')
+    return
+  }
+
+  await logger.error(
+    'Could not update Next dev origin allowlist; preview HMR may warn about cross-origin requests',
+  )
 }
 
 // Poll the dev port from inside the sandbox until it answers HTTP or the

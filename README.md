@@ -31,9 +31,13 @@ Slack messages use the same Ivan session flow as the app text box, via Chat SDK'
 
 Mention Ivan in a Slack thread or DM it directly. The first message creates an Ivan workspace session; later Slack messages in that same thread are sent to the same session.
 
-### Known caveat (validate first)
+### Sandbox preview HMR
 
-Next.js 16 defaults to Turbopack, whose HMR can be unreliable behind the sandbox proxy, so `src/lib/shell/creation.ts` starts the dev server with `--webpack`. Whether hot reload survives the public sandbox URL inside a cross-origin iframe is the one assumption worth validating before relying on it.
+Next.js 16 defaults to Turbopack, whose HMR can be unreliable behind the sandbox proxy, so `src/lib/shell/creation.ts` starts sandboxed dev servers with `--webpack`. Ivan's own dev server allowlists hosts from `IVAN_APP_URL`, `NEXT_PUBLIC_APP_URL`, and `IVAN_ALLOWED_DEV_ORIGINS` so it can run behind ngrok or another tunnel.
+
+Before booting a Next 16 target app, Ivan also adds the sandbox preview host to that app's `allowedDevOrigins` so `/_next` dev resources can load from the public `sb-*.vercel.run` iframe.
+
+That runtime allowlist edit is marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
 
 ## What's Included
 
