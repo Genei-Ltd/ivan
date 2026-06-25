@@ -52,6 +52,43 @@ async function installClaudeCLI(
   return false
 }
 
+// Make the Postgres client available so the agent can connect to an Aiven fork
+// (via the MCP's credentials) and run SQL. The Vercel Sandbox base image ships
+// Node and git but not psql. Best-effort and non-fatal: provisioning continues
+// even if it fails, and the agent can fall back to a Node pg client.
+async function installPsql(
+  sandbox: Sandbox,
+  logger: SessionLogger,
+): Promise<void> {
+  const existing = await runCommandInSandbox(sandbox, 'which', ['psql'])
+  if (existing.success && existing.output?.includes('psql')) {
+    await logger.info('psql already installed')
+    return
+  }
+  await logger.info('Installing psql…')
+  // The base image is Amazon Linux 2023 (dnf), but cover apt/apk in case the
+  // runtime image changes. Each runs as-is then retried under non-interactive
+  // sudo, in case commands are not already root.
+  const attempts = [
+    'dnf install -y postgresql16 || dnf install -y postgresql15',
+    'microdnf install -y postgresql16 || microdnf install -y postgresql15',
+    'apt-get update && apt-get install -y postgresql-client',
+    'apk add --no-cache postgresql-client',
+  ]
+  for (const cmd of attempts) {
+    await runCommandInSandbox(sandbox, 'sh', [
+      '-c',
+      `(${cmd}) || (sudo -n sh -c '${cmd}')`,
+    ])
+    const check = await runCommandInSandbox(sandbox, 'which', ['psql'])
+    if (check.success && check.output?.includes('psql')) {
+      await logger.success('psql installed')
+      return
+    }
+  }
+  await logger.error('Could not install psql; SQL access may be unavailable')
+}
+
 // Provision a sandbox: clone the locked repo, install deps + the agent, create
 // the session branch, and start the dev server on an exposed port. Returns the
 // public preview domain and the branch name. Node-only path.
@@ -114,6 +151,9 @@ export async function createSandbox(
     if (!claudeReady) {
       return { success: false, error: 'Failed to install Claude CLI', sandbox }
     }
+
+    // Postgres client so the agent can connect to an Aiven fork and run SQL.
+    await installPsql(sandbox, logger)
 
     // Git identity + session branch.
     await runInProject(sandbox, 'git', ['config', 'user.name', 'Lovable Shell'])
