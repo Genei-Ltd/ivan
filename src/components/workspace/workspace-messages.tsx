@@ -163,9 +163,16 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
 }
 
 function UserMessage({ message }: { message: ChatMessage }) {
+  const hasImageAttachments = Boolean(message.attachments?.length)
+
   return (
     <div className="flex justify-end">
-      <div className="bg-muted text-foreground w-fit max-w-[85%] rounded-3xl px-4 py-2.5 text-sm">
+      <div
+        className={cn(
+          'bg-muted text-foreground w-fit max-w-[85%] rounded-2xl px-4 py-2.5 text-sm',
+          hasImageAttachments && 'pb-4',
+        )}
+      >
         <Markdown small withBreaks>
           {message.content}
         </Markdown>

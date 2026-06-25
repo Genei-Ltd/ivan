@@ -192,7 +192,7 @@ export function Workspace({ id }: { id: string }) {
         className="h-svh"
       >
         <ResizablePanel
-          defaultSize={isDesktop ? '42%' : '50%'}
+          defaultSize={isDesktop ? '25rem' : '50%'}
           minSize={isDesktop ? '22rem' : '30%'}
           maxSize={isDesktop ? '72%' : '75%'}
           className="min-h-0 min-w-0"

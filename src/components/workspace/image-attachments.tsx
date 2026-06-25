@@ -109,8 +109,17 @@ export function MessageImageAttachments({
     return null
   }
 
+  const columnCount = Math.min(attachments.length, 3)
+
   return (
-    <div className="mt-2 grid max-w-64 grid-cols-3 gap-1.5">
+    <div
+      className={cn(
+        'mt-2 grid w-fit gap-1.5',
+        columnCount === 1 && 'grid-cols-1',
+        columnCount === 2 && 'grid-cols-2',
+        columnCount === 3 && 'grid-cols-3',
+      )}
+    >
       {attachments.map((attachment, index) => (
         <a
           key={attachment.id}
@@ -118,7 +127,7 @@ export function MessageImageAttachments({
           target="_blank"
           rel="noreferrer"
           title={`${attachment.name} · ${formatBytes(attachment.size)}`}
-          className="focus-visible:ring-ring bg-muted aspect-square rounded-lg border bg-cover bg-center outline-none transition-opacity hover:opacity-80 focus-visible:ring-2"
+          className="focus-visible:ring-ring bg-muted size-20 rounded-lg border bg-cover bg-center outline-none transition-opacity hover:opacity-80 focus-visible:ring-2"
           style={{ backgroundImage: imageBackground(attachment.url) }}
           aria-label={`Open ${attachment.name || `image ${String(index + 1)}`}`}
         />
