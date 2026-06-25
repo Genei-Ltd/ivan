@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2Icon, SparklesIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { IvanLogo } from '@/components/layout/ivan-logo'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
@@ -40,10 +41,15 @@ export default function Home() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 px-4">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <span className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase">
-          Ivan
-        </span>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex items-center">
+          <IvanLogo
+            alt="Ivan"
+            priority
+            sizes="64px"
+            className="size-16 rounded-xl shadow-sm"
+          />
+        </div>
         <h1 className="text-3xl font-bold tracking-tight">
           Change production. Break nothing.
         </h1>

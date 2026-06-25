@@ -24,6 +24,7 @@ import type {
   ToolCallPart,
 } from '@/lib/shell/types'
 import { cn } from '@/lib/utils'
+import { IvanLogo } from '@/components/layout/ivan-logo'
 import { Markdown } from '@/components/workspace/markdown'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -297,8 +298,12 @@ export function Workspace({ id }: { id: string }) {
       {/* Left: chat + activity */}
       <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-md md:border-r md:border-b-0">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
-          <Link href="/" className="text-sm font-semibold">
-            Ivan
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
+            <IvanLogo className="size-7 rounded-lg" sizes="28px" />
+            <span>Ivan</span>
           </Link>
           <div className="flex items-center gap-2">
             {busy && (

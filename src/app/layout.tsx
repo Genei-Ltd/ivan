@@ -12,6 +12,10 @@ export const metadata: Metadata = {
     default: 'Ivan',
   },
   description: 'Ship changes to your app by talking to Ivan.',
+  icons: {
+    icon: '/brand/ivan-logo.png',
+    apple: '/brand/ivan-logo.png',
+  },
 }
 
 export default function RootLayout({

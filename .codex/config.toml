@@ -1,0 +1,10 @@
+[mcp_servers.coloop-docs]
+url = "https://docs.coloop.ai/mcp"
+
+[mcp_servers.shadcn]
+command = "pnpm"
+args = [
+    "dlx",
+    "shadcn@latest",
+    "mcp",
+]
