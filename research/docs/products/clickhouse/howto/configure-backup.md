@@ -1,0 +1,86 @@
+---
+title: Schedule Aiven for ClickHouse® backups
+sidebar_label: Configure backups
+---
+
+import ConsoleLabel from "@site/src/components/ConsoleIcons";
+import RelatedPages from "@site/src/components/RelatedPages";
+import EditBackUpSchedule from "@site/static/includes/service-backups-instructions.md";
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Set the time when
+[backups](/docs/products/clickhouse/concepts/disaster-recovery#service-backup) are taken
+for your Aiven for ClickHouse® service.
+
+## Prerequisites
+
+- To
+  [configure backup time](/docs/products/clickhouse/howto/configure-backup#configure-backup-time),
+  one of the following tools:
+  - [Aiven Console](https://console.aiven.io)
+  - [Aiven API](/docs/tools/api)
+  - [Aiven CLI](/docs/tools/cli)
+- To
+  [reset or delete configured backup settings](/docs/products/clickhouse/howto/configure-backup#restore-defaults),
+  one of the following tools:
+  - [Aiven API](/docs/tools/api)
+  - [Aiven CLI](/docs/tools/cli)
+- At least one Aiven for ClickHouse service backup to be configured
+
+## Configure backup time
+
+:::note
+A backup process can only start when the previous backup process completes.
+:::
+
+<EditBackUpSchedule/>
+
+## Restore defaults
+
+<Tabs groupId="group1">
+<TabItem value="console" label="Console" default>
+The [Aiven Console](https://console.aiven.io) doesn't support restoring defaults. Use
+the Aiven [API](/docs/tools/api) or [CLI](/docs/tools/cli).
+</TabItem>
+<TabItem value="api" label="Aiven API">
+Call the [ServiceUpdate](https://api.aiven.io/doc/#tag/Service/operation/ServiceUpdate)
+endpoint, and set the backup scheduling parameters to `null` or remove them from
+`user_config`. Replace placeholders `SERVICE_NAME` and `PROJECT_NAME` with meaningful values.
+
+```bash{7-8}
+curl --request PUT                                                        \
+  --url https://api.aiven.io/v1/project/PROJECT_NAME/service/SERVICE_NAME \
+  --header 'Authorization: Bearer YOUR_BEARER_TOKEN'                      \
+  --header 'content-type: application/json'                               \
+  --data '{
+      "user_config": {
+          "backup_hour": null,
+          "backup_minute": null
+      }
+  }'
+```
+
+</TabItem>
+<TabItem value="cli" label="Aiven CLI">
+Run the [avn service update](/docs/tools/cli/service-cli#avn-cli-service-update) command,
+and set the backup scheduling parameters to `null` or remove them from `user_config`.
+Replace placeholders `SERVICE_NAME` and `PROJECT_NAME` with meaningful values.
+
+```bash{4-5}
+avn service update SERVICE_NAME \
+  --project PROJECT_NAME        \
+  --user-config '{
+      "backup_hour": null,
+      "backup_minute": null
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+<RelatedPages/>
+
+- [Disaster Recovery testing scenarios](/docs/platform/concepts/disaster-recovery-test-scenarios)
+- [Fork and restore from Aiven for ClickHouse® backups](/docs/products/clickhouse/howto/restore-backup)
+- [Disaster recovery in Aiven for ClickHouse®](/docs/products/clickhouse/concepts/disaster-recovery)

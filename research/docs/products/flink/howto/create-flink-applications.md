@@ -1,0 +1,22 @@
+---
+title: Use Aiven for Apache Flink® applications
+---
+
+[Aiven for Flink applications](/docs/products/flink/concepts/flink-applications) in Aiven for Apache Flink® servers as a container that includes everything connected to a Flink job, including source and sink connections and data processing logic.
+
+Using the [Aiven Console](https://console.aiven.io/), you can create
+applications that run SQL queries or deploy custom JARs, catering to
+diverse data processing requirements. The console's guided wizard
+simplifies the application configuration process, from selecting source
+and sink tables for SQL applications to uploading and managing JAR files
+for custom job execution.
+
+:::important
+Custom JARs for Aiven for Apache Flink is a
+[limited availability feature](/docs/platform/concepts/service-and-feature-releases#limited-availability-). If you're interested in trying out this feature, contact
+the [sales team](https://aiven.io/contact).
+:::
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList/>
