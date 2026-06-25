@@ -18,10 +18,38 @@ export type SessionStatus =
   | 'error'
   | 'stopped'
 
+export type ToolStatus = 'running' | 'done' | 'error'
+
+// A plain-text segment of an assistant turn.
+export interface TextPart {
+  type: 'text'
+  text: string
+}
+
+// A single tool invocation in an assistant turn. MCP tools are named
+// `mcp__<server>__<tool>` and carry a `server`; everything else is a native
+// Claude Code tool (Read, Edit, Bash, …). Rendered as a card in the workspace,
+// which is how the agent's MCP usage (the Aiven calls) is made visible.
+export interface ToolCallPart {
+  type: 'tool'
+  id: string // tool_use id, used to match the tool_result that completes it
+  name: string // raw tool name, e.g. mcp__aiven__ServiceCreate
+  server?: string // MCP server slug for mcp__<server>__ tools
+  provider: string // display label, e.g. 'Aiven' or 'Claude'
+  action: string // humanised tool action, e.g. 'Service Create'
+  detail?: string // short argument summary
+  status: ToolStatus
+}
+
+export type MessagePart = TextPart | ToolCallPart
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  // Ordered parts of an assistant turn (text segments interleaved with tool
+  // calls). Absent on user messages and on plain-text assistant replies.
+  parts?: MessagePart[]
 }
 
 // Streamed to the browser over SSE. The client upserts chat messages by id and

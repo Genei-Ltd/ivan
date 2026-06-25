@@ -106,8 +106,8 @@ async function runAgentTurn(id: string, instruction: string): Promise<void> {
     aivenReadOnly: env.AIVEN_READ_ONLY === 'true',
     aivenAllowSecrets: env.AIVEN_ALLOW_SECRETS === 'true',
     logger,
-    onAssistantContent: (content) => {
-      setMessage(id, { id: assistantId, role: 'assistant', content })
+    onAssistantUpdate: ({ content, parts }) => {
+      setMessage(id, { id: assistantId, role: 'assistant', content, parts })
     },
   })
 

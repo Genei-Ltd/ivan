@@ -1,8 +1,14 @@
+import { randomUUID } from 'node:crypto'
 import { Writable } from 'node:stream'
 import type { Sandbox } from '@vercel/sandbox'
 import { runCommandInSandbox, runInProject, PROJECT_DIR } from './commands'
 import type { SessionLogger } from './logger'
-import type { AgentExecutionResult } from './types'
+import type {
+  AgentExecutionResult,
+  MessagePart,
+  TextPart,
+  ToolCallPart,
+} from './types'
 
 export interface RunClaudeOptions {
   model: string
@@ -21,38 +27,83 @@ export interface RunClaudeOptions {
   // with a fork-scoped token that cannot reach prod.
   aivenAllowSecrets?: boolean
   logger: SessionLogger
-  // Called with the full accumulated assistant content on every update, so the
-  // caller can upsert the streaming chat message.
-  onAssistantContent: (content: string) => void
+  // Called on every streaming update with the assistant turn so far: the
+  // concatenated text plus the ordered parts (text segments and tool calls).
+  onAssistantUpdate: (update: { content: string; parts: MessagePart[] }) => void
 }
 
-// Turn a tool_use block into a short human-readable status line.
-function describeToolUse(
-  toolName: string,
-  input: Record<string, unknown>,
-): string {
-  const str = (v: unknown) => (typeof v === 'string' ? v : '')
-  switch (toolName) {
-    case 'Write':
-    case 'Edit':
-      return `Editing ${str(input.path) || str(input.file_path) || 'file'}`
-    case 'Read':
-      return `Reading ${str(input.path) || str(input.file_path) || 'file'}`
-    case 'Glob':
-      return `Searching files: ${str(input.pattern) || '*'}`
-    case 'Grep':
-      return `Grep: ${str(input.pattern) || 'pattern'}`
-    case 'Bash': {
-      const command = str(input.command) || 'command'
-      return `Running: ${command.length > 60 ? command.slice(0, 60) + '…' : command}`
+// Humanise a raw tool identifier: snake_case / camelCase / PascalCase to Title
+// Case (e.g. `list_projects` -> `List Projects`, `ServiceCreate` -> `Service
+// Create`).
+function humanise(raw: string): string {
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// Pull a short, human-readable argument summary out of a tool call's input:
+// the first few scalar fields, each clipped, joined for a one-line preview.
+function summariseInput(input: Record<string, unknown>): string | undefined {
+  const fields: string[] = []
+  for (const [key, value] of Object.entries(input)) {
+    if (fields.length >= 3) {
+      break
     }
-    default:
-      return ''
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      const text = String(value)
+      const clipped = text.length > 48 ? `${text.slice(0, 48)}…` : text
+      fields.push(`${key}: ${clipped}`)
+    }
+  }
+  return fields.length > 0 ? fields.join(' · ') : undefined
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  aiven: 'Aiven',
+}
+
+// Build a structured tool-call part from a tool_use block. MCP tools are named
+// `mcp__<server>__<tool>`; everything else is a native Claude Code tool.
+function toolCallPart(
+  id: string,
+  name: string,
+  input: Record<string, unknown>,
+): ToolCallPart {
+  let server: string | undefined
+  let provider: string
+  let action: string
+
+  if (name.startsWith('mcp__')) {
+    const segments = name.split('__')
+    server = segments[1] || 'mcp'
+    provider = PROVIDER_LABELS[server] ?? humanise(server)
+    action = humanise(segments.slice(2).join('_') || name)
+  } else {
+    provider = 'Claude'
+    action = humanise(name)
+  }
+
+  return {
+    type: 'tool',
+    id,
+    name,
+    server,
+    provider,
+    action,
+    detail: summariseInput(input),
+    status: 'running',
   }
 }
 
 // Run the Claude Code engine headlessly inside the sandbox, streaming its
-// stream-json output back through onAssistantContent. Secrets and the prompt
+// stream-json output back through onAssistantUpdate. Secrets and the prompt
 // are passed via env (not interpolated into the shell), and completion is
 // awaited via the detached command rather than polling.
 export async function executeClaudeInSandbox(
@@ -69,7 +120,7 @@ export async function executeClaudeInSandbox(
     aivenReadOnly,
     aivenAllowSecrets,
     logger,
-    onAssistantContent,
+    onAssistantUpdate,
   } = opts
 
   const cliCheck = await runCommandInSandbox(sandbox, 'which', ['claude'])
@@ -119,9 +170,35 @@ export async function executeClaudeInSandbox(
 
   await logger.command(`claude ${flags.join(' ')} -- "<prompt>"`)
 
-  let accumulated = ''
+  // The assistant turn as ordered parts: text segments interleaved with tool
+  // calls. tool_use blocks append a running tool part; the matching tool_result
+  // (which arrives later as a `user` line) flips it to done/error.
+  const parts: MessagePart[] = []
   let extractedSessionId: string | undefined
   let pending = ''
+
+  const textContent = () =>
+    parts
+      .filter((p): p is TextPart => p.type === 'text')
+      .map((p) => p.text)
+      .join('')
+
+  // Emit a fresh snapshot so already-buffered updates aren't mutated later.
+  const emitUpdate = () => {
+    onAssistantUpdate({
+      content: textContent(),
+      parts: parts.map((p) => ({ ...p })),
+    })
+  }
+
+  const appendText = (text: string) => {
+    const last = parts.at(-1)
+    if (last?.type === 'text') {
+      last.text += text
+    } else {
+      parts.push({ type: 'text', text })
+    }
+  }
 
   const handleLine = (line: string) => {
     const trimmed = line.trim()
@@ -132,7 +209,10 @@ export async function executeClaudeInSandbox(
       type?: string
       text?: string
       name?: string
+      id?: string
       input?: Record<string, unknown>
+      tool_use_id?: string
+      is_error?: boolean
     }
     interface StreamLine {
       type?: string
@@ -150,20 +230,47 @@ export async function executeClaudeInSandbox(
       extractedSessionId = parsed.session_id
     }
 
-    if (parsed.type === 'assistant' && parsed.message?.content) {
+    if (!parsed.message?.content) {
+      return
+    }
+
+    if (parsed.type === 'assistant') {
       for (const block of parsed.message.content) {
         if (block.type === 'text' && typeof block.text === 'string') {
-          accumulated += block.text
-          onAssistantContent(accumulated)
+          appendText(block.text)
+          emitUpdate()
         } else if (
           block.type === 'tool_use' &&
           typeof block.name === 'string'
         ) {
-          const status = describeToolUse(block.name, block.input ?? {})
-          if (status) {
-            accumulated += `\n\n_${status}_\n\n`
-            onAssistantContent(accumulated)
-            void logger.info(status)
+          const part = toolCallPart(
+            block.id ?? randomUUID(),
+            block.name,
+            block.input ?? {},
+          )
+          parts.push(part)
+          emitUpdate()
+          void logger.info(
+            part.detail
+              ? `${part.provider}: ${part.action} — ${part.detail}`
+              : `${part.provider}: ${part.action}`,
+          )
+        }
+      }
+    } else if (parsed.type === 'user') {
+      // tool_result blocks complete a previously-streamed tool call.
+      for (const block of parsed.message.content) {
+        if (
+          block.type === 'tool_result' &&
+          typeof block.tool_use_id === 'string'
+        ) {
+          const target = parts.find(
+            (p): p is ToolCallPart =>
+              p.type === 'tool' && p.id === block.tool_use_id,
+          )
+          if (target) {
+            target.status = block.is_error ? 'error' : 'done'
+            emitUpdate()
           }
         }
       }
@@ -206,6 +313,19 @@ export async function executeClaudeInSandbox(
     if (pending) {
       handleLine(pending)
     } // flush any trailing partial line
+
+    // Settle any tool calls whose tool_result never arrived so the UI doesn't
+    // leave them spinning forever.
+    let settled = false
+    for (const part of parts) {
+      if (part.type === 'tool' && part.status === 'running') {
+        part.status = 'done'
+        settled = true
+      }
+    }
+    if (settled) {
+      emitUpdate()
+    }
 
     if (finished.exitCode !== 0) {
       await logger.error(`Claude exited with code ${String(finished.exitCode)}`)

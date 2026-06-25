@@ -3,15 +3,26 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
+  CheckIcon,
+  DatabaseIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   GitPullRequestIcon,
   Loader2Icon,
+  PencilIcon,
+  SearchIcon,
   SendIcon,
   TerminalIcon,
+  TriangleAlertIcon,
+  WrenchIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSessionStream } from '@/hooks/use-session-stream'
-import type { SessionStatus } from '@/lib/shell/types'
+import type {
+  ChatMessage,
+  SessionStatus,
+  ToolCallPart,
+} from '@/lib/shell/types'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/workspace/markdown'
 import { Button } from '@/components/ui/button'
@@ -46,6 +57,115 @@ function statusVariant(
     return 'outline'
   }
   return 'secondary'
+}
+
+function ToolIcon({
+  part,
+  className,
+}: {
+  part: ToolCallPart
+  className?: string
+}) {
+  if (part.server) {
+    return <DatabaseIcon className={className} />
+  }
+  switch (part.name) {
+    case 'Edit':
+    case 'Write':
+    case 'MultiEdit':
+      return <PencilIcon className={className} />
+    case 'Read':
+      return <FileTextIcon className={className} />
+    case 'Bash':
+      return <TerminalIcon className={className} />
+    case 'Grep':
+    case 'Glob':
+      return <SearchIcon className={className} />
+    default:
+      return <WrenchIcon className={className} />
+  }
+}
+
+function ToolStatusIcon({ status }: { status: ToolCallPart['status'] }) {
+  if (status === 'running') {
+    return (
+      <Loader2Icon className="text-muted-foreground size-4 shrink-0 animate-spin" />
+    )
+  }
+  if (status === 'error') {
+    return <TriangleAlertIcon className="text-destructive size-4 shrink-0" />
+  }
+  return (
+    <CheckIcon className="size-4 shrink-0 text-green-600 dark:text-green-400" />
+  )
+}
+
+// A single tool call rendered as a card. MCP calls (which carry a server, e.g.
+// Aiven) get the brand treatment so the agent's MCP usage is unmissable.
+function ToolCall({ part }: { part: ToolCallPart }) {
+  const isMcp = Boolean(part.server)
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm',
+        isMcp ? 'border-brand/30 bg-brand-subtle/40' : 'bg-card',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-7 shrink-0 items-center justify-center rounded-lg',
+          isMcp
+            ? 'bg-brand text-brand-foreground'
+            : 'bg-muted text-muted-foreground',
+        )}
+      >
+        <ToolIcon part={part} className="size-3.5" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              'text-[10px] font-semibold tracking-wider uppercase',
+              isMcp ? 'text-brand' : 'text-muted-foreground',
+            )}
+          >
+            {part.provider}
+          </span>
+          <span className="truncate font-medium">{part.action}</span>
+        </div>
+        {part.detail && (
+          <span className="text-muted-foreground truncate font-mono text-xs">
+            {part.detail}
+          </span>
+        )}
+      </div>
+      <ToolStatusIcon status={part.status} />
+    </div>
+  )
+}
+
+// An assistant turn: ordered text segments interleaved with tool-call cards.
+// Falls back to plain content (or a spinner) before any parts have streamed.
+function AssistantMessage({ message }: { message: ChatMessage }) {
+  if (message.parts && message.parts.length > 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        {message.parts.map((part, index) =>
+          part.type === 'tool' ? (
+            <ToolCall key={part.id} part={part} />
+          ) : part.text.trim() ? (
+            <Markdown key={index} small>
+              {part.text}
+            </Markdown>
+          ) : null,
+        )}
+      </div>
+    )
+  }
+  if (message.content) {
+    return <Markdown small>{message.content}</Markdown>
+  }
+  return <Loader2Icon className="text-muted-foreground size-4 animate-spin" />
 }
 
 export function Workspace({ id }: { id: string }) {
@@ -164,11 +284,7 @@ export function Workspace({ id }: { id: string }) {
                 </div>
               ) : (
                 <div key={message.id} className="group/message w-full min-w-0">
-                  {message.content ? (
-                    <Markdown small>{message.content}</Markdown>
-                  ) : (
-                    <Loader2Icon className="text-muted-foreground size-4 animate-spin" />
-                  )}
+                  <AssistantMessage message={message} />
                 </div>
               ),
             )}
