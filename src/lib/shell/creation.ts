@@ -8,6 +8,7 @@ import {
 } from './package-manager'
 import type { SessionLogger } from './logger'
 import type { SandboxResult } from './types'
+import { getAuthenticatedGitHubIdentity } from './github'
 import { getEnv } from '@/lib/env'
 
 // Embed the GitHub token so the cloned repo can be pushed back to later.
@@ -156,16 +157,18 @@ export async function createSandbox(
     await installPsql(sandbox, logger)
 
     // Git identity + session branch.
+    const gitIdentity = await getAuthenticatedGitHubIdentity()
     await runInProject(sandbox, 'git', [
       'config',
       'user.name',
-      'Ivan The Great',
+      gitIdentity.name,
     ])
     await runInProject(sandbox, 'git', [
       'config',
       'user.email',
-      'ivan@aiven.io',
+      gitIdentity.email,
     ])
+    await logger.info(`Configured git author from @${gitIdentity.login}`)
     const createBranch = await runInProject(sandbox, 'git', [
       'checkout',
       '-b',
