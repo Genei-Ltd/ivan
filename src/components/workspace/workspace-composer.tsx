@@ -31,6 +31,9 @@ export function WorkspaceComposer({
   onSend: () => void
   onSubmit: () => void
 }) {
+  const sendingLocked = busy || posting
+  const canSend = !sendingLocked && Boolean(input.trim())
+
   return (
     <div className="p-4">
       <div
@@ -59,13 +62,17 @@ export function WorkspaceComposer({
               !event.shiftKey &&
               !event.nativeEvent.isComposing
             ) {
+              if (sendingLocked) {
+                return
+              }
               event.preventDefault()
-              onSend()
+              if (canSend) {
+                onSend()
+              }
             }
           }}
           placeholder="Describe a change…"
           rows={2}
-          disabled={busy}
           className="min-h-12 max-h-48 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         <div className="flex items-center justify-between gap-2">
@@ -103,7 +110,7 @@ export function WorkspaceComposer({
             size="sm"
             className="rounded-full"
             onClick={onSend}
-            disabled={busy || posting || !input.trim()}
+            disabled={!canSend}
           >
             <SendIcon className="size-4" />
             Send
