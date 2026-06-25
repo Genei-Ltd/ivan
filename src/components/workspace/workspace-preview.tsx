@@ -1,13 +1,18 @@
-import { ExternalLinkIcon, Loader2Icon } from 'lucide-react'
-import type { SessionStatus } from '@/lib/shell/types'
+import type { RefObject } from 'react'
+import { ExternalLinkIcon, Loader2Icon, TerminalIcon } from 'lucide-react'
+import type { LogEntry, SessionStatus } from '@/lib/shell/types'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ActivityLog } from '@/components/workspace/workspace-activity'
 import { STATUS_LABEL } from '@/components/workspace/workspace-status'
 
 export function WorkspacePreview({
+  logEndRef,
+  logs,
   previewUrl,
   status,
 }: {
+  logEndRef: RefObject<HTMLDivElement | null>
+  logs: LogEntry[]
   previewUrl?: string
   status: SessionStatus | 'connecting'
 }) {
@@ -38,7 +43,18 @@ export function WorkspacePreview({
               {STATUS_LABEL[status]}… the preview appears once the dev server is
               up.
             </p>
-            <Skeleton className="h-40 w-full max-w-lg" />
+            <div className="bg-muted/40 flex h-56 min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-lg border text-left shadow-xs">
+              <div className="text-muted-foreground flex h-10 shrink-0 items-center gap-2 border-b px-4 text-xs">
+                <TerminalIcon className="size-3.5" />
+                Activity ({logs.length})
+              </div>
+              <ActivityLog
+                className="border-t-0 bg-background/70"
+                contentClassName="py-3"
+                logEndRef={logEndRef}
+                logs={logs}
+              />
+            </div>
           </div>
         )}
       </div>

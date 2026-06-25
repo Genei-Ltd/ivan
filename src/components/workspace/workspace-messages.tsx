@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type RefObject } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ChevronRightIcon,
   DatabaseIcon,
@@ -18,6 +18,19 @@ import { normalizeKnownSlackMentions } from '@/lib/slack/mentions'
 import { MessageImageAttachments } from '@/components/workspace/image-attachments'
 import { Markdown } from '@/components/workspace/markdown'
 import { ScrollArea } from '@/components/ui/scroll-area'
+
+const BOTTOM_STICKINESS_THRESHOLD = 48
+
+function isNearBottom(element: HTMLElement) {
+  return (
+    element.scrollHeight - element.scrollTop - element.clientHeight <=
+    BOTTOM_STICKINESS_THRESHOLD
+  )
+}
+
+function scrollToBottom(element: HTMLElement) {
+  element.scrollTop = element.scrollHeight
+}
 
 function ToolIcon({
   part,
@@ -186,32 +199,63 @@ function UserMessage({ message }: { message: ChatMessage }) {
 
 export function WorkspaceMessages({
   error,
-  messageEndRef,
   messages,
 }: {
   error?: string
-  messageEndRef: RefObject<HTMLDivElement | null>
   messages: ChatMessage[]
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const shouldStickToBottomRef = useRef(true)
+
+  function handleScroll() {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+    shouldStickToBottomRef.current = isNearBottom(viewport)
+  }
+
+  useEffect(() => {
+    if (!shouldStickToBottomRef.current) {
+      return
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = viewportRef.current
+      if (viewport && shouldStickToBottomRef.current) {
+        scrollToBottom(viewport)
+      }
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+    }
+  }, [error, messages])
+
   return (
-    <ScrollArea className="h-full min-h-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:block!">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
-        {messages.map((message) =>
-          message.role === 'user' ? (
-            <UserMessage key={message.id} message={message} />
-          ) : (
-            <div key={message.id} className="group/message w-full min-w-0">
-              <AssistantMessage message={message} />
+    <div className="h-full min-h-0 flex-1">
+      <ScrollArea
+        className="size-full [&_[data-slot=scroll-area-viewport]>div]:block!"
+        viewportRef={viewportRef}
+        viewportProps={{ onScroll: handleScroll }}
+      >
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
+          {messages.map((message) =>
+            message.role === 'user' ? (
+              <UserMessage key={message.id} message={message} />
+            ) : (
+              <div key={message.id} className="group/message w-full min-w-0">
+                <AssistantMessage message={message} />
+              </div>
+            ),
+          )}
+          {error && (
+            <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
+              {error}
             </div>
-          ),
-        )}
-        {error && (
-          <div className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
-            {error}
-          </div>
-        )}
-        <div ref={messageEndRef} aria-hidden="true" />
-      </div>
-    </ScrollArea>
+          )}
+          <div aria-hidden="true" />
+        </div>
+      </ScrollArea>
+    </div>
   )
 }

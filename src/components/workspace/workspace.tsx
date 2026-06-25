@@ -49,8 +49,8 @@ export function Workspace({ id }: { id: string }) {
   const [showLogs, setShowLogs] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const imageAttachments = useImageAttachments()
-  const messageEndRef = useRef<HTMLDivElement>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
+  const previewLogEndRef = useRef<HTMLDivElement>(null)
 
   // Keep the sandbox alive while this workspace is open. Heartbeat every 2
   // minutes, well inside the server's 5-minute keepalive window, so a missed
@@ -93,13 +93,16 @@ export function Workspace({ id }: { id: string }) {
   }, [showLogs, state.logs.length])
 
   useEffect(() => {
+    if (state.previewUrl) {
+      return
+    }
     const frame = window.requestAnimationFrame(() => {
-      scrollRefIntoView(messageEndRef)
+      scrollRefIntoView(previewLogEndRef)
     })
     return () => {
       window.cancelAnimationFrame(frame)
     }
-  }, [state.messages, state.error])
+  }, [state.previewUrl, state.logs.length])
 
   const busy = isBusy(state.status)
   const mainPanelOrientation = isDesktop ? 'horizontal' : 'vertical'
@@ -169,11 +172,7 @@ export function Workspace({ id }: { id: string }) {
   }
 
   const messages = (
-    <WorkspaceMessages
-      error={state.error}
-      messageEndRef={messageEndRef}
-      messages={state.messages}
-    />
+    <WorkspaceMessages error={state.error} messages={state.messages} />
   )
   const activityToggle = (
     <ActivityToggle
@@ -256,6 +255,8 @@ export function Workspace({ id }: { id: string }) {
           className="min-h-0 min-w-0"
         >
           <WorkspacePreview
+            logEndRef={previewLogEndRef}
+            logs={state.logs}
             previewUrl={state.previewUrl}
             status={state.status}
           />

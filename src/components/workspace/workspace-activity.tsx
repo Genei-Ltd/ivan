@@ -24,15 +24,24 @@ export function ActivityToggle({
 }
 
 export function ActivityLog({
+  className,
+  contentClassName,
   logEndRef,
   logs,
 }: {
+  className?: string
+  contentClassName?: string
   logEndRef: RefObject<HTMLDivElement | null>
   logs: LogEntry[]
 }) {
   return (
-    <ScrollArea className="min-h-0 flex-1 border-t">
-      <div className="space-y-0.5 px-4 py-2 font-mono text-xs">
+    <ScrollArea className={cn('min-h-0 flex-1 border-t', className)}>
+      <div
+        className={cn(
+          'space-y-0.5 px-4 py-2 font-mono text-xs',
+          contentClassName,
+        )}
+      >
         {logs.map((log, index) => (
           <div
             key={`${log.timestamp}-${String(index)}`}
