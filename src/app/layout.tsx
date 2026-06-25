@@ -21,7 +21,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={fontVariables}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${fontVariables} antialiased`}
+    >
       <body className="typography-dense min-h-svh antialiased">
         <AppProviders>{children}</AppProviders>
       </body>

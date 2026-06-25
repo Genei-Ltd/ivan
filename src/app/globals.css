@@ -272,6 +272,17 @@
   --border: var(--color-cloud); /* neutral-200 */
   --input: var(--color-cloud);
   --ring: oklch(0.645 0.0952 276.79);
+  --image-outline-color: rgba(0, 0, 0, 0.1);
+  --shadow-border:
+    0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06),
+    0 2px 4px 0 rgba(0, 0, 0, 0.04);
+  --shadow-border-hover:
+    0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08),
+    0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  --shadow-border-focus:
+    0 0 0 1px color-mix(in oklch, var(--ring) 55%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent),
+    0 2px 4px 0 rgba(0, 0, 0, 0.04);
 
   /* Brand action fill. The true brand Orchid (#b27dbc) fails WCAG AA as a text
      background (white 3.2:1, charcoal 4.38:1), so the solid `brand` button uses
@@ -390,6 +401,12 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.728 0.0819 276.79);
+  --image-outline-color: rgba(255, 255, 255, 0.1);
+  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
+  --shadow-border-focus:
+    0 0 0 1px color-mix(in oklch, var(--ring) 60%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent);
 
   /* Brand stays orchid-600 + white text (AA on dark). */
   --brand: oklch(0.566 0.1082 321.04);
@@ -443,6 +460,19 @@
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
+}
+@utility shadow-border {
+  box-shadow: var(--shadow-border);
+}
+@utility shadow-border-hover {
+  box-shadow: var(--shadow-border-hover);
+}
+@utility shadow-border-focus {
+  box-shadow: var(--shadow-border-focus);
+}
+@utility image-outline {
+  outline: 1px solid var(--image-outline-color);
+  outline-offset: -1px;
 }
 
 @utility animate-log-entry {
@@ -511,6 +541,10 @@
   }
   p {
     text-wrap: pretty;
+  }
+  img {
+    outline: 1px solid var(--image-outline-color);
+    outline-offset: -1px;
   }
   ::selection {
     background-color: oklch(0.879 0.0407 320.83 / 0.5); /* lilac */

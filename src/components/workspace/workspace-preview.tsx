@@ -42,7 +42,7 @@ export function WorkspacePreview({
                 is up.
               </p>
             </div>
-            <div className="bg-muted/40 flex min-h-56 w-full flex-1 flex-col overflow-hidden rounded-lg border text-left shadow-xs">
+            <div className="shadow-border flex min-h-56 w-full flex-1 flex-col overflow-hidden rounded-lg bg-muted/40 text-left">
               <ActivityLog
                 className="border-t-0 bg-background/70"
                 contentClassName="py-3"

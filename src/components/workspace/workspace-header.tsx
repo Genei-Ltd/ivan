@@ -17,7 +17,10 @@ export function WorkspaceHeader({
 }) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
-      <Link href="/" className="flex items-center gap-2 text-sm font-semibold">
+      <Link
+        href="/"
+        className="-mx-1 flex min-h-10 items-center gap-2 rounded-md px-1 text-sm font-semibold outline-none transition-[color,box-shadow] hover:text-brand focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         <IvanLogo className="size-7 rounded-lg" sizes="28px" />
         <span>Ivan</span>
       </Link>

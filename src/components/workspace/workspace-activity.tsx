@@ -19,7 +19,7 @@ export function ActivityToggle({
       aria-busy={active}
       onClick={onToggle}
       className={cn(
-        'text-muted-foreground hover:text-foreground flex w-full items-center gap-2 px-4 py-2 text-xs transition-colors',
+        'flex min-h-10 w-full items-center gap-2 px-4 py-2 text-xs text-muted-foreground transition-[background-color,color] hover:text-foreground',
         active &&
           'animate-shimmer-reverse bg-[linear-gradient(90deg,transparent,color-mix(in_oklch,var(--color-brand-subtle)_35%,transparent),transparent)] bg-size-[200%_100%]',
       )}
@@ -30,7 +30,8 @@ export function ActivityToggle({
           active && 'animate-pulse text-muted-foreground/80',
         )}
       />
-      Activity ({logCount})
+      <span>Activity</span>
+      <span className="tabular-nums">({logCount})</span>
     </button>
   )
 }

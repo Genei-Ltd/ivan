@@ -10,16 +10,16 @@ type RevealProps = Omit<ComponentProps<typeof motion.div>, 'children'> & {
 
 /**
  * Fade-and-rise on scroll into view. Reduced motion is handled globally by the
- * MotionConfig in providers (reducedMotion="user"), which drops the transform
- * and keeps a plain fade.
+ * MotionConfig in providers (reducedMotion="user"), which drops transform
+ * changes and keeps a plain fade.
  */
 export function Reveal({ delay = 0, children, ...props }: RevealProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.5, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+      transition={{ type: 'spring', duration: 0.45, delay, bounce: 0 }}
       {...props}
     >
       {children}

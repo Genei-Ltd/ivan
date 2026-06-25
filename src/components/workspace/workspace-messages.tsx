@@ -12,6 +12,7 @@ import {
   TriangleAlertIcon,
   WrenchIcon,
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { ChatMessage, ToolCallPart } from '@/lib/shell/types'
 import { useStickToBottom } from '@/hooks/use-stick-to-bottom'
 import { cn } from '@/lib/utils'
@@ -96,7 +97,7 @@ function NativeToolCall({ part }: { part: ToolCallPart }) {
         {expandable && (
           <ChevronRightIcon
             className={cn(
-              'size-3 shrink-0 transition-transform',
+              'size-3 shrink-0 transition-transform duration-150',
               open && 'rotate-90',
             )}
           />
@@ -104,11 +105,24 @@ function NativeToolCall({ part }: { part: ToolCallPart }) {
         <span className="flex-1" />
         <ToolStatusIcon status={part.status} className="size-3.5" />
       </button>
-      {open && part.detail && (
-        <div className="text-muted-foreground mt-0.5 ml-5 font-mono wrap-break-word">
-          {part.detail}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {open && part.detail && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{
+              opacity: 0,
+              y: -6,
+              filter: 'blur(4px)',
+              transition: { duration: 0.15, ease: 'easeIn' },
+            }}
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            className="text-muted-foreground mt-0.5 ml-5 font-mono wrap-break-word"
+          >
+            {part.detail}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -120,7 +134,7 @@ function ToolCall({ part }: { part: ToolCallPart }) {
     return <NativeToolCall part={part} />
   }
   return (
-    <div className="border-brand/30 bg-brand-subtle/40 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
+    <div className="shadow-border flex items-center gap-2.5 rounded-2xl bg-brand-subtle/40 px-3 py-2 text-sm">
       <span className="bg-brand text-brand-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
         <ToolIcon part={part} className="size-3.5" />
       </span>

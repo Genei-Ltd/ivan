@@ -41,8 +41,8 @@ export function WorkspaceComposer({
         onDragLeave={busy ? undefined : imageAttachments.handleDragLeave}
         onDrop={busy ? undefined : imageAttachments.handleDrop}
         className={cn(
-          'bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors',
-          imageAttachments.dragging && 'border-ring/70 bg-accent/20',
+          'shadow-border hover:shadow-border-hover focus-within:shadow-border-focus mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl bg-card p-2.5 transition-[background-color,box-shadow] duration-150 ease-out',
+          imageAttachments.dragging && 'shadow-border-focus bg-accent/20',
         )}
       >
         <PendingImageAttachments
