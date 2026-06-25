@@ -47,9 +47,9 @@ export async function parseAgentRequest(
     }
 
     const rawContent = formData.get(field)
-    const content =
-      typeof rawContent === 'string' ? rawContent.trim() : undefined
-    if (!content) {
+    const content = typeof rawContent === 'string' ? rawContent.trim() : ''
+    const files = formData.getAll('images').filter(isFileEntry)
+    if (!content && (field === 'prompt' || files.length === 0)) {
       return {
         ok: false,
         status: 400,
@@ -60,7 +60,6 @@ export async function parseAgentRequest(
       }
     }
 
-    const files = formData.getAll('images').filter(isFileEntry)
     try {
       assertImageAttachmentCount(files.length)
       const attachments = await Promise.all(

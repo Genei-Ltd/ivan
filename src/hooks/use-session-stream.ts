@@ -43,7 +43,7 @@ function reduce(state: StreamState, event: ShellEvent): StreamState {
       const messages =
         index >= 0
           ? state.messages.map((m) =>
-              m.id === event.message.id ? event.message : m,
+              m.id === event.message.id ? mergeMessage(m, event.message) : m,
             )
           : [...state.messages, event.message]
       return { ...state, messages }
@@ -63,16 +63,43 @@ function reduce(state: StreamState, event: ShellEvent): StreamState {
   }
 }
 
-function messageSize(message: ChatMessage): number {
-  return JSON.stringify(message).length
+function mergeMessage(existing: ChatMessage | undefined, next: ChatMessage) {
+  if (!existing) {
+    return next
+  }
+  if (existing.role === 'assistant' && next.role === 'assistant') {
+    return mergeAssistantMessage(existing, next)
+  }
+  return next
 }
 
-function mergeMessage(existing: ChatMessage | undefined, next: ChatMessage) {
-  if (
-    existing?.role === 'assistant' &&
-    next.role === 'assistant' &&
-    messageSize(existing) > messageSize(next)
-  ) {
+function assistantMessageScore(message: ChatMessage): number {
+  const parts = message.parts ?? []
+  const terminalTools = parts.filter(
+    (part) => part.type === 'tool' && part.status !== 'running',
+  ).length
+  const textLength =
+    message.content.length +
+    parts
+      .filter((part) => part.type === 'text')
+      .reduce((length, part) => length + part.text.length, 0)
+
+  // Parts carry tool/MCP cards. Weight them above raw text length so a snapshot
+  // with structured cards is never discarded in favor of older plain text.
+  const partsWeight = parts.length * 100_000
+  const terminalToolWeight = terminalTools * 1_000
+  const runningToolPenalty =
+    parts.filter((part) => part.type === 'tool' && part.status === 'running')
+      .length * 10
+
+  return partsWeight + terminalToolWeight + textLength - runningToolPenalty
+}
+
+function mergeAssistantMessage(
+  existing: ChatMessage,
+  next: ChatMessage,
+): ChatMessage {
+  if (assistantMessageScore(existing) > assistantMessageScore(next)) {
     return existing
   }
   return next

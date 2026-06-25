@@ -33,6 +33,13 @@ interface CreateSessionOptions {
 
 const resumePromises = new Map<string, Promise<void>>()
 
+function hasAssistantOutput(session: Session | undefined, messageId: string) {
+  const message = session?.messages.find((m) => m.id === messageId)
+  const hasContent = Boolean(message?.content.trim())
+  const hasParts = (message?.parts?.length ?? 0) > 0
+  return hasContent ? true : hasParts
+}
+
 // Kick off a new session: record it, surface the first user message, and start
 // provisioning + the initial agent turn in the background. Returns immediately
 // so the client can navigate to the workspace and subscribe to events.
@@ -247,11 +254,13 @@ async function runAgentTurn(
   }
 
   if (!result.success) {
-    setMessage(id, {
-      id: assistantId,
-      role: 'assistant',
-      content: result.error ?? 'The agent run failed.',
-    })
+    if (!hasAssistantOutput(await ensureSessionLoaded(id), assistantId)) {
+      setMessage(id, {
+        id: assistantId,
+        role: 'assistant',
+        content: result.error ?? 'The agent run failed.',
+      })
+    }
     emit(id, { kind: 'error', message: result.error ?? 'Agent run failed' })
     emit(id, { kind: 'status', status: 'error' })
     return

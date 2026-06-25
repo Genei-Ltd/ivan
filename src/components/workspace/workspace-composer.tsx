@@ -35,7 +35,9 @@ export function WorkspaceComposer({
 }) {
   const canResume = status === 'stopped' || status === 'error'
   const sendingLocked = busy || posting || canResume
-  const canSend = !sendingLocked && Boolean(input.trim())
+  const hasDraft =
+    Boolean(input.trim()) || imageAttachments.attachments.length > 0
+  const canSend = !sendingLocked && hasDraft
 
   return (
     <div className="p-4">

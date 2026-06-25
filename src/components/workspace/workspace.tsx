@@ -54,7 +54,11 @@ export function Workspace({ id }: { id: string }) {
 
   async function send() {
     const content = input.trim()
-    if (!content || busy || posting) {
+    if (
+      (!content && imageAttachments.attachments.length === 0) ||
+      busy ||
+      posting
+    ) {
       return
     }
     setPosting(true)

@@ -20,6 +20,7 @@ export function WorkspacePreview({
   status: SessionStatus | 'connecting'
 }) {
   const canResume = status === 'stopped' || status === 'error'
+  const previewActionLabel = canResume ? 'Resume' : 'Restart preview'
 
   return (
     <main className="relative flex size-full flex-col">
@@ -33,7 +34,7 @@ export function WorkspacePreview({
               onClick={onResume}
               disabled={resumeDisabled}
             >
-              Resume
+              {previewActionLabel}
               <RotateCcwIcon className="size-4" />
             </Button>
           )}
