@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  CheckIcon,
+  ChevronRightIcon,
   DatabaseIcon,
   ExternalLinkIcon,
   FileTextIcon,
@@ -86,49 +86,88 @@ function ToolIcon({
   }
 }
 
-function ToolStatusIcon({ status }: { status: ToolCallPart['status'] }) {
+// Only surface in-progress and failed states; a completed call needs no icon
+// (a wall of green checks is just noise).
+function ToolStatusIcon({
+  status,
+  className = 'size-4',
+}: {
+  status: ToolCallPart['status']
+  className?: string
+}) {
   if (status === 'running') {
     return (
-      <Loader2Icon className="text-muted-foreground size-4 shrink-0 animate-spin" />
+      <Loader2Icon
+        className={cn('text-muted-foreground shrink-0 animate-spin', className)}
+      />
     )
   }
   if (status === 'error') {
-    return <TriangleAlertIcon className="text-destructive size-4 shrink-0" />
+    return (
+      <TriangleAlertIcon
+        className={cn('text-destructive shrink-0', className)}
+      />
+    )
   }
+  return null
+}
+
+// Native Claude Code tool calls (Read, Edit, Bash, …) are noisy, so they render
+// as a compact one-line row showing just the action. If there is a detail
+// summary, the row expands to reveal it on click.
+function NativeToolCall({ part }: { part: ToolCallPart }) {
+  const [open, setOpen] = useState(false)
+  const expandable = Boolean(part.detail)
   return (
-    <CheckIcon className="size-4 shrink-0 text-green-600 dark:text-green-400" />
+    <div className="text-xs">
+      <button
+        type="button"
+        disabled={!expandable}
+        onClick={() => {
+          setOpen((v) => !v)
+        }}
+        className={cn(
+          'text-muted-foreground flex w-full items-center gap-1.5 rounded-md py-0.5 text-left',
+          expandable && 'hover:text-foreground cursor-pointer',
+        )}
+      >
+        <ToolIcon part={part} className="size-3.5 shrink-0" />
+        <span className="font-medium">{part.action}</span>
+        {expandable && (
+          <ChevronRightIcon
+            className={cn(
+              'size-3 shrink-0 transition-transform',
+              open && 'rotate-90',
+            )}
+          />
+        )}
+        <span className="flex-1" />
+        <ToolStatusIcon status={part.status} className="size-3.5" />
+      </button>
+      {open && part.detail && (
+        <div className="text-muted-foreground mt-0.5 ml-5 font-mono wrap-break-word">
+          {part.detail}
+        </div>
+      )}
+    </div>
   )
 }
 
-// A single tool call rendered as a card. MCP calls (which carry a server, e.g.
-// Aiven) get the brand treatment so the agent's MCP usage is unmissable.
+// A single tool call. MCP calls (which carry a server, e.g. Aiven) get the full
+// branded card so the agent's MCP usage is unmissable; native tools fall back
+// to the compact row above.
 function ToolCall({ part }: { part: ToolCallPart }) {
-  const isMcp = Boolean(part.server)
+  if (!part.server) {
+    return <NativeToolCall part={part} />
+  }
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm',
-        isMcp ? 'border-brand/30 bg-brand-subtle/40' : 'bg-card',
-      )}
-    >
-      <span
-        className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-lg',
-          isMcp
-            ? 'bg-brand text-brand-foreground'
-            : 'bg-muted text-muted-foreground',
-        )}
-      >
+    <div className="border-brand/30 bg-brand-subtle/40 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm">
+      <span className="bg-brand text-brand-foreground flex size-7 shrink-0 items-center justify-center rounded-lg">
         <ToolIcon part={part} className="size-3.5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              'text-[10px] font-semibold tracking-wider uppercase',
-              isMcp ? 'text-brand' : 'text-muted-foreground',
-            )}
-          >
+          <span className="text-brand text-[10px] font-semibold tracking-wider uppercase">
             {part.provider}
           </span>
           <span className="truncate font-medium">{part.action}</span>
