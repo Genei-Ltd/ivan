@@ -378,14 +378,19 @@ async function startDevServer(
   })
 
   const devEnv: Record<string, string> = {}
-  if (env.DATABASE_URL) {
-    devEnv.DATABASE_URL = env.DATABASE_URL
-  }
-  if (env.DATABASE_CA_CERT_BASE64) {
-    devEnv.DATABASE_CA_CERT_BASE64 = env.DATABASE_CA_CERT_BASE64
-  }
-  if (env.DATABASE_SSL) {
-    devEnv.DATABASE_SSL = env.DATABASE_SSL
+  if (env.SANDBOX_DATABASE_URL) {
+    devEnv.DATABASE_URL = env.SANDBOX_DATABASE_URL
+
+    const ca =
+      env.SANDBOX_DATABASE_CA_CERT_BASE64 ?? env.DATABASE_CA_CERT_BASE64
+    if (ca) {
+      devEnv.DATABASE_CA_CERT_BASE64 = ca
+    }
+
+    const ssl = env.SANDBOX_DATABASE_SSL ?? env.DATABASE_SSL
+    if (ssl) {
+      devEnv.DATABASE_SSL = ssl
+    }
   }
 
   await sandbox.runCommand({
