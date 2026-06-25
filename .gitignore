@@ -43,3 +43,6 @@ yarn.lock
 .vercel
 .env*
 !.env.example
+
+# vibes
+repomix*.xml
