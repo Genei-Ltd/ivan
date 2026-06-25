@@ -16,6 +16,10 @@ export interface RunClaudeOptions {
   // argv or the config string) and the MCP child inherits it.
   aivenToken?: string
   aivenReadOnly?: boolean
+  // Let the MCP return real connection credentials (URIs, passwords, certs) so
+  // the agent can connect to a fork and run SQL directly. Dev/fork only; pair
+  // with a fork-scoped token that cannot reach prod.
+  aivenAllowSecrets?: boolean
   logger: SessionLogger
   // Called with the full accumulated assistant content on every update, so the
   // caller can upsert the streaming chat message.
@@ -63,6 +67,7 @@ export async function executeClaudeInSandbox(
     resumeSessionId,
     aivenToken,
     aivenReadOnly,
+    aivenAllowSecrets,
     logger,
     onAssistantContent,
   } = opts
@@ -105,6 +110,7 @@ export async function executeClaudeInSandbox(
     })
     env.AIVEN_TOKEN = aivenToken
     env.AIVEN_READ_ONLY = aivenReadOnly ? 'true' : 'false'
+    env.AIVEN_ALLOW_SECRETS = aivenAllowSecrets ? 'true' : 'false'
     flags.push('--mcp-config "$AIVEN_MCP_CONFIG"')
   }
 

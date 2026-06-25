@@ -34,6 +34,10 @@ const schema = z.object({
   // Restrict the MCP to non-destructive operations. Defaults to write access
   // (false) so the agent can actually create services.
   AIVEN_READ_ONLY: z.enum(['true', 'false']).default('false'),
+  // Let the MCP return real connection credentials so the agent can connect to
+  // a fork and run SQL. On by default; pair with a fork-scoped token that
+  // cannot reach prod. Set false to harden.
+  AIVEN_ALLOW_SECRETS: z.enum(['true', 'false']).default('true'),
 
   SANDBOX_DEV_PORT: z.coerce.number().int().positive().default(3000),
   SANDBOX_TIMEOUT_MS: z.coerce
