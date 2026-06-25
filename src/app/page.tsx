@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2Icon, SparklesIcon } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { useImageAttachments } from '@/hooks/use-image-attachments'
 import { IvanLogo } from '@/components/layout/ivan-logo'
@@ -80,8 +79,8 @@ export default function Home() {
           onDragLeave={starting ? undefined : imageAttachments.handleDragLeave}
           onDrop={starting ? undefined : imageAttachments.handleDrop}
           className={cn(
-            'shadow-border hover:shadow-border-hover focus-within:shadow-border-focus mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl bg-card p-2.5 transition-[background-color,box-shadow] duration-150 ease-out',
-            imageAttachments.dragging && 'shadow-border-focus bg-accent/20',
+            'bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors',
+            imageAttachments.dragging && 'border-ring/70 bg-accent/20',
           )}
         >
           <PendingImageAttachments
@@ -121,24 +120,11 @@ export default function Home() {
               onClick={() => void start()}
               disabled={starting || !prompt.trim()}
             >
-              <span className="relative size-4">
-                <AnimatePresence initial={false} mode="popLayout">
-                  <motion.span
-                    key={starting ? 'loading' : 'sparkles'}
-                    initial={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, scale: 0.25, filter: 'blur(4px)' }}
-                    transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    {starting ? (
-                      <Loader2Icon className="size-4 animate-spin" />
-                    ) : (
-                      <SparklesIcon className="size-4" />
-                    )}
-                  </motion.span>
-                </AnimatePresence>
-              </span>
+              {starting ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <SparklesIcon className="size-4" />
+              )}
               Start building
             </Button>
           </div>

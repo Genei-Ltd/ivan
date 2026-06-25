@@ -37,10 +37,10 @@ export function ImageAttachmentPicker({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         disabled={disabled}
         aria-label="Attach images"
-        className="rounded-full"
+        className="size-8 rounded-full"
         onClick={() => {
           inputRef.current?.click()
         }}
@@ -77,7 +77,7 @@ export function PendingImageAttachments({
           <div
             aria-label={attachment.file.name || `Image ${String(index + 1)}`}
             role="img"
-            className="image-outline bg-muted size-full rounded-xl bg-cover bg-center shadow-sm"
+            className="bg-muted size-full rounded-xl border bg-cover bg-center shadow-sm"
             style={{ backgroundImage: imageBackground(attachment.url) }}
           />
           <button
@@ -85,7 +85,8 @@ export function PendingImageAttachments({
             disabled={disabled}
             aria-label="Remove image"
             className={cn(
-              "absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-[scale,background-color,box-shadow] duration-150 ease-out after:absolute after:top-1/2 after:left-1/2 after:size-10 after:-translate-1/2 after:content-[''] hover:bg-background active:scale-[0.96] disabled:opacity-50",
+              'bg-background/95 text-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm',
+              'transition-colors hover:bg-background disabled:opacity-50',
             )}
             onClick={() => {
               onRemove(attachment.id)
@@ -126,7 +127,7 @@ export function MessageImageAttachments({
           target="_blank"
           rel="noreferrer"
           title={`${attachment.name} · ${formatBytes(attachment.size)}`}
-          className="image-outline focus-visible:ring-ring bg-muted size-20 rounded-lg bg-cover bg-center outline-none transition-opacity hover:opacity-80 focus-visible:ring-2"
+          className="focus-visible:ring-ring bg-muted size-20 rounded-lg border bg-cover bg-center outline-none transition-opacity hover:opacity-80 focus-visible:ring-2"
           style={{ backgroundImage: imageBackground(attachment.url) }}
           aria-label={`Open ${attachment.name || `image ${String(index + 1)}`}`}
         />
