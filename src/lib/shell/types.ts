@@ -43,10 +43,19 @@ export interface ToolCallPart {
 
 export type MessagePart = TextPart | ToolCallPart
 
+export interface ChatImageAttachment {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  url: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  attachments?: ChatImageAttachment[]
   // Ordered parts of an assistant turn (text segments interleaved with tool
   // calls). Absent on user messages and on plain-text assistant replies.
   parts?: MessagePart[]

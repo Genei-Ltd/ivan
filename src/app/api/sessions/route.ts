@@ -1,31 +1,19 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { createSession } from '@/lib/shell/manager'
 import { listSessions } from '@/lib/shell/store'
+import { parseAgentRequest } from '@/lib/shell/request'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const createSchema = z.object({ prompt: z.string().min(1) })
-
 export async function POST(request: Request) {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const parsed = createSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'A non-empty prompt is required' },
-      { status: 400 },
-    )
+  const parsed = await parseAgentRequest(request, 'prompt')
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
 
   try {
-    const session = createSession(parsed.data.prompt)
+    const session = createSession(parsed.content, parsed.attachments)
     return NextResponse.json({ id: session.id }, { status: 201 })
   } catch (error: unknown) {
     return NextResponse.json(

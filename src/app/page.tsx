@@ -4,15 +4,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2Icon, SparklesIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { useImageAttachments } from '@/hooks/use-image-attachments'
 import { IvanLogo } from '@/components/layout/ivan-logo'
+import {
+  ImageAttachmentPicker,
+  PendingImageAttachments,
+} from '@/components/workspace/image-attachments'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Toaster } from '@/components/ui/sonner'
+import { cn } from '@/lib/utils'
 
 export default function Home() {
   const router = useRouter()
   const [prompt, setPrompt] = useState('')
   const [starting, setStarting] = useState(false)
+  const imageAttachments = useImageAttachments()
 
   async function start() {
     const trimmed = prompt.trim()
@@ -21,15 +28,21 @@ export default function Home() {
     }
     setStarting(true)
     try {
+      const formData = new FormData()
+      formData.append('prompt', trimmed)
+      for (const attachment of imageAttachments.attachments) {
+        formData.append('images', attachment.file, attachment.file.name)
+      }
+
       const res = await fetch('/api/sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: formData,
       })
       const data = (await res.json()) as { id?: string; error?: string }
       if (!res.ok || !data.id) {
         throw new Error(data.error ?? 'Failed to start session')
       }
+      imageAttachments.clearAttachments()
       router.push(`/workspace/${data.id}`)
     } catch (error) {
       toast.error(
@@ -61,12 +74,26 @@ export default function Home() {
       </div>
 
       <div className="w-full max-w-2xl">
-        <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
+        <div
+          onDragOver={starting ? undefined : imageAttachments.handleDragOver}
+          onDragLeave={starting ? undefined : imageAttachments.handleDragLeave}
+          onDrop={starting ? undefined : imageAttachments.handleDrop}
+          className={cn(
+            'bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors',
+            imageAttachments.dragging && 'border-ring/70 bg-accent/20',
+          )}
+        >
+          <PendingImageAttachments
+            attachments={imageAttachments.attachments}
+            disabled={starting}
+            onRemove={imageAttachments.removeAttachment}
+          />
           <Textarea
             value={prompt}
             onChange={(event) => {
               setPrompt(event.target.value)
             }}
+            onPaste={starting ? undefined : imageAttachments.handlePaste}
             onKeyDown={(event) => {
               if (
                 event.key === 'Enter' &&
@@ -82,7 +109,11 @@ export default function Home() {
             disabled={starting}
             className="max-h-48 min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <ImageAttachmentPicker
+              disabled={starting}
+              onFiles={imageAttachments.addFiles}
+            />
             <Button
               size="sm"
               className="rounded-full"

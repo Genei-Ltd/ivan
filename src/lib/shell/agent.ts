@@ -9,11 +9,20 @@ import type {
   TextPart,
   ToolCallPart,
 } from './types'
+import {
+  imageAttachmentPrompt,
+  sandboxImagePath,
+  SANDBOX_IMAGE_DIR,
+  type PreparedImageAttachment,
+  type UploadedImageAttachment,
+} from './attachments'
 
 export interface RunClaudeOptions {
+  sessionId: string
   model: string
   apiKey: string
   baseUrl?: string
+  imageAttachments?: UploadedImageAttachment[]
   // Pass the previous Claude chat session id to continue the conversation in a
   // kept-alive sandbox (multi-turn chat).
   resumeSessionId?: string
@@ -122,9 +131,11 @@ export async function executeClaudeInSandbox(
   opts: RunClaudeOptions,
 ): Promise<AgentExecutionResult> {
   const {
+    sessionId,
     model,
     apiKey,
     baseUrl,
+    imageAttachments = [],
     resumeSessionId,
     aivenToken,
     aivenReadOnly,
@@ -142,6 +153,56 @@ export async function executeClaudeInSandbox(
     }
   }
 
+  let effectiveInstruction = instruction
+  if (imageAttachments.length > 0) {
+    const attachmentDir = `${SANDBOX_IMAGE_DIR}/${sessionId}`
+    const mkdir = await runCommandInSandbox(sandbox, 'mkdir', [
+      '-p',
+      attachmentDir,
+    ])
+    if (!mkdir.success) {
+      return {
+        success: false,
+        changesDetected: false,
+        error: mkdir.error ?? 'Failed to prepare image attachments',
+      }
+    }
+
+    const preparedAttachments: PreparedImageAttachment[] = imageAttachments.map(
+      (attachment) => ({
+        ...attachment,
+        path: sandboxImagePath(sessionId, attachment),
+      }),
+    )
+
+    try {
+      await sandbox.writeFiles(
+        preparedAttachments.map((attachment) => ({
+          path: attachment.path,
+          content: attachment.data,
+        })),
+      )
+    } catch (error) {
+      return {
+        success: false,
+        changesDetected: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to write image attachments',
+      }
+    }
+    await logger.info(
+      `Attached ${String(preparedAttachments.length)} image${
+        preparedAttachments.length === 1 ? '' : 's'
+      } for this turn`,
+    )
+    effectiveInstruction = imageAttachmentPrompt(
+      instruction,
+      preparedAttachments,
+    )
+  }
+
   const flags = [
     `--model ${model}`,
     '--print',
@@ -156,7 +217,7 @@ export async function executeClaudeInSandbox(
 
   const env: Record<string, string> = {
     ANTHROPIC_API_KEY: apiKey,
-    AGENT_PROMPT: instruction,
+    AGENT_PROMPT: effectiveInstruction,
     IVAN_SYSTEM_PROMPT,
   }
   if (baseUrl) {

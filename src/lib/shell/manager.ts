@@ -12,6 +12,7 @@ import {
   setKeepAliveDeadline,
   setMessage,
   setSandbox,
+  storeImageAttachments,
 } from './store'
 import { createSessionLogger } from './logger'
 import { branchNameFromPrompt } from './branch'
@@ -19,11 +20,18 @@ import { createSandbox } from './creation'
 import { executeClaudeInSandbox } from './agent'
 import { pushChangesToBranch } from './git'
 import { createPullRequest } from './github'
+import {
+  toChatImageAttachment,
+  type UploadedImageAttachment,
+} from './attachments'
 
 // Kick off a new session: record it, surface the first user message, and start
 // provisioning + the initial agent turn in the background. Returns immediately
 // so the client can navigate to the workspace and subscribe to events.
-export function createSession(prompt: string): Session {
+export function createSession(
+  prompt: string,
+  attachments: UploadedImageAttachment[] = [],
+): Session {
   const env = getEnv()
   const id = randomUUID()
   const branch = branchNameFromPrompt(prompt)
@@ -31,6 +39,9 @@ export function createSession(prompt: string): Session {
     id: randomUUID(),
     role: 'user' as const,
     content: prompt,
+    attachments: attachments.map((attachment) =>
+      toChatImageAttachment(id, attachment),
+    ),
   }
   const session: Session = {
     id,
@@ -43,16 +54,21 @@ export function createSession(prompt: string): Session {
     createdAt: new Date().toISOString(),
   }
   createSessionRecord(session)
+  storeImageAttachments(id, attachments)
   emit(id, { kind: 'status', status: 'creating' })
   // Buffer the first user message as an event so late SSE subscribers replay it.
   // It is already in session.messages, so emit() updates in place (no dupe).
   setMessage(id, firstMessage)
 
-  void provisionAndRun(id, prompt)
+  void provisionAndRun(id, prompt, attachments)
   return session
 }
 
-async function provisionAndRun(id: string, prompt: string): Promise<void> {
+async function provisionAndRun(
+  id: string,
+  prompt: string,
+  attachments: UploadedImageAttachment[],
+): Promise<void> {
   const logger = createSessionLogger(id)
   const session = getSession(id)
   if (!session) {
@@ -78,12 +94,16 @@ async function provisionAndRun(id: string, prompt: string): Promise<void> {
   }
   emit(id, { kind: 'status', status: 'ready' })
 
-  await runAgentTurn(id, prompt)
+  await runAgentTurn(id, prompt, attachments)
 }
 
 // Run one agent turn against the session's sandbox, streaming the assistant
 // message as it is produced.
-async function runAgentTurn(id: string, instruction: string): Promise<void> {
+async function runAgentTurn(
+  id: string,
+  instruction: string,
+  attachments: UploadedImageAttachment[] = [],
+): Promise<void> {
   const env = getEnv()
   const logger = createSessionLogger(id)
   const sandbox = getSandbox(id)
@@ -98,10 +118,12 @@ async function runAgentTurn(id: string, instruction: string): Promise<void> {
   setMessage(id, { id: assistantId, role: 'assistant', content: '' })
 
   const result = await executeClaudeInSandbox(sandbox, instruction, {
+    sessionId: id,
     model: env.AGENT_MODEL,
     apiKey: env.ANTHROPIC_API_KEY,
     baseUrl: env.ANTHROPIC_BASE_URL,
     resumeSessionId: getClaudeSessionId(id),
+    imageAttachments: attachments,
     aivenToken: env.AIVEN_TOKEN,
     aivenReadOnly: env.AIVEN_READ_ONLY === 'true',
     aivenAllowSecrets: env.AIVEN_ALLOW_SECRETS === 'true',
@@ -131,13 +153,25 @@ async function runAgentTurn(id: string, instruction: string): Promise<void> {
 }
 
 // Handle a follow-up chat message: record it and run another agent turn.
-export async function sendMessage(id: string, content: string): Promise<void> {
+export async function sendMessage(
+  id: string,
+  content: string,
+  attachments: UploadedImageAttachment[] = [],
+): Promise<void> {
   const session = getSession(id)
   if (!session) {
     throw new Error('Session not found')
   }
-  setMessage(id, { id: randomUUID(), role: 'user', content })
-  await runAgentTurn(id, content)
+  storeImageAttachments(id, attachments)
+  setMessage(id, {
+    id: randomUUID(),
+    role: 'user',
+    content,
+    attachments: attachments.map((attachment) =>
+      toChatImageAttachment(id, attachment),
+    ),
+  })
+  await runAgentTurn(id, content, attachments)
 }
 
 // Commit, push, and open a PR from the session branch.

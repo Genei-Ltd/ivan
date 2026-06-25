@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import type { Sandbox } from '@vercel/sandbox'
 import type { ChatMessage, LogEntry, Session, ShellEvent } from './types'
+import type { UploadedImageAttachment } from './attachments'
 
 // In-memory session store with a per-session event bus. Replaces the
 // template's Postgres persistence. Suitable for an internal, single-process
@@ -14,6 +15,7 @@ interface Runtime {
   session: Session
   emitter: EventEmitter
   buffer: ShellEvent[]
+  attachments?: Map<string, UploadedImageAttachment>
   sandbox?: Sandbox
   claudeSessionId?: string
   // Wall-clock ms timestamp the sandbox is currently set to auto-terminate at.
@@ -35,7 +37,12 @@ const runtimes: Map<string, Runtime> =
 export function createSessionRecord(session: Session): void {
   const emitter = new EventEmitter()
   emitter.setMaxListeners(0)
-  runtimes.set(session.id, { session, emitter, buffer: [] })
+  runtimes.set(session.id, {
+    session,
+    emitter,
+    buffer: [],
+    attachments: new Map(),
+  })
 }
 
 export function getSession(id: string): Session | undefined {
@@ -79,6 +86,28 @@ export function setClaudeSessionId(id: string, claudeSessionId: string): void {
   if (r) {
     r.claudeSessionId = claudeSessionId
   }
+}
+
+export function storeImageAttachments(
+  id: string,
+  attachments: UploadedImageAttachment[],
+): void {
+  const r = runtimes.get(id)
+  if (!r) {
+    return
+  }
+  r.attachments ??= new Map()
+  for (const attachment of attachments) {
+    r.attachments.set(attachment.id, attachment)
+  }
+}
+
+export function getImageAttachment(
+  id: string,
+  attachmentId: string,
+): UploadedImageAttachment | undefined {
+  const r = runtimes.get(id)
+  return r?.attachments?.get(attachmentId)
 }
 
 // Emit an event: persist any state it implies onto the session, buffer it for
