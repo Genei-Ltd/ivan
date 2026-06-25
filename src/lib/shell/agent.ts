@@ -69,6 +69,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   aiven: 'Aiven',
 }
 
+const IVAN_SYSTEM_PROMPT = [
+  'Ivan is used to safely change applications against cloned or forked Aiven-backed infrastructure.',
+  'When a request may touch databases, data services, Kafka, caches, search, migrations, seeded data, performance issues, or production-like infrastructure, actively inspect and use the Aiven MCP tools when they are available.',
+  'Prefer working against an Aiven fork or clone of the relevant service before changing code, running migrations, or validating data-dependent behavior. Never mutate production Aiven services directly.',
+  'If the Aiven MCP is unavailable, read-only, or missing required permissions, say that briefly and continue with the safest local or mocked fallback.',
+].join('\n')
+
 // Build a structured tool-call part from a tool_use block. MCP tools are named
 // `mcp__<server>__<tool>`; everything else is a native Claude Code tool.
 function toolCallPart(
@@ -138,6 +145,7 @@ export async function executeClaudeInSandbox(
     '--dangerously-skip-permissions',
     '--output-format stream-json',
     '--verbose',
+    '--append-system-prompt "$IVAN_SYSTEM_PROMPT"',
   ]
   if (resumeSessionId) {
     flags.push(`--resume "${resumeSessionId}"`)
@@ -146,6 +154,7 @@ export async function executeClaudeInSandbox(
   const env: Record<string, string> = {
     ANTHROPIC_API_KEY: apiKey,
     AGENT_PROMPT: instruction,
+    IVAN_SYSTEM_PROMPT,
   }
   if (baseUrl) {
     env.ANTHROPIC_BASE_URL = baseUrl
