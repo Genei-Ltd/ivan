@@ -16,6 +16,10 @@ interface Runtime {
   buffer: ShellEvent[]
   sandbox?: Sandbox
   claudeSessionId?: string
+  // Wall-clock ms timestamp the sandbox is currently set to auto-terminate at.
+  // Tracked so the keepalive only extends when the runway drops below the
+  // window, rather than ballooning the total on every heartbeat.
+  keepAliveDeadline?: number
 }
 
 const MAX_BUFFER = 10000
@@ -52,6 +56,17 @@ export function setSandbox(id: string, sandbox: Sandbox | undefined): void {
   const r = runtimes.get(id)
   if (r) {
     r.sandbox = sandbox
+  }
+}
+
+export function getKeepAliveDeadline(id: string): number | undefined {
+  return runtimes.get(id)?.keepAliveDeadline
+}
+
+export function setKeepAliveDeadline(id: string, deadline: number): void {
+  const r = runtimes.get(id)
+  if (r) {
+    r.keepAliveDeadline = deadline
   }
 }
 

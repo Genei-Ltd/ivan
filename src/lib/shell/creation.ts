@@ -220,10 +220,21 @@ async function startDevServer(
     }
   }
 
+  // Bind explicitly to 0.0.0.0 and the exposed port so the sandbox proxy can
+  // reach it (a process on 127.0.0.1 only, or that drifted to 3001, would 502
+  // with SANDBOX_NOT_LISTENING).
+  const port = String(env.SANDBOX_DEV_PORT)
+  const nextArgs = [
+    '-p',
+    port,
+    '-H',
+    '0.0.0.0',
+    ...(isNext16 ? ['--webpack'] : []),
+  ]
   const devArgs =
     packageManager === 'npm'
-      ? ['run', 'dev', ...(isNext16 ? ['--', '--webpack'] : [])]
-      : ['dev', ...(isNext16 ? ['--webpack'] : [])]
+      ? ['run', 'dev', '--', ...nextArgs]
+      : ['dev', ...nextArgs]
   const devCommand = `${packageManager} ${devArgs.join(' ')}`
 
   await logger.info(`Starting dev server: ${devCommand}`)
@@ -257,6 +268,33 @@ async function startDevServer(
     stderr: captureDev,
   })
 
-  // Give the server a moment to bind before the preview iframe points at it.
-  await new Promise((resolve) => setTimeout(resolve, 3000))
+  // Wait for the port to actually answer before the preview iframe points at
+  // it. A cold `next dev` compile takes far longer than a fixed sleep, and the
+  // 502 error page does not retry itself, so we must not surface the URL early.
+  const ready = await waitForPort(sandbox, env.SANDBOX_DEV_PORT, logger)
+  if (!ready) {
+    await logger.error(
+      'Dev server did not start listening in time; the preview may 502 until it finishes compiling',
+    )
+  }
+}
+
+// Poll the dev port from inside the sandbox until it answers HTTP or the
+// deadline passes. `curl` (no -f) exits 0 once the port accepts a connection,
+// even mid-compile, which is exactly the "is it listening" signal we want.
+async function waitForPort(
+  sandbox: Sandbox,
+  port: number,
+  logger: SessionLogger,
+): Promise<boolean> {
+  const deadlineSeconds = 120
+  await logger.info('Waiting for the dev server to start listening…')
+  const result = await runCommandInSandbox(sandbox, 'sh', [
+    '-c',
+    `for i in $(seq 1 ${String(deadlineSeconds)}); do curl -s -o /dev/null http://localhost:${String(port)} && exit 0; sleep 1; done; exit 1`,
+  ])
+  if (result.success) {
+    await logger.success('Dev server is listening')
+  }
+  return result.success
 }

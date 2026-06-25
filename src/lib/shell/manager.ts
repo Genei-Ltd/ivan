@@ -5,9 +5,11 @@ import {
   createSessionRecord,
   emit,
   getClaudeSessionId,
+  getKeepAliveDeadline,
   getSandbox,
   getSession,
   setClaudeSessionId,
+  setKeepAliveDeadline,
   setMessage,
   setSandbox,
 } from './store'
@@ -60,6 +62,9 @@ async function provisionAndRun(id: string, prompt: string): Promise<void> {
   const result = await createSandbox(session.branch, logger)
   if (result.sandbox) {
     setSandbox(id, result.sandbox)
+    // The sandbox starts with the base timeout; track its deadline so the
+    // workspace keepalive can roll it forward while the page is open.
+    setKeepAliveDeadline(id, Date.now() + getEnv().SANDBOX_TIMEOUT_MS)
   }
 
   if (!result.success || !result.sandbox) {
@@ -182,6 +187,38 @@ export async function submitSession(id: string): Promise<void> {
       message: error instanceof Error ? error.message : 'Failed to open PR',
     })
     emit(id, { kind: 'status', status: 'error' })
+  }
+}
+
+// Keep the workspace's sandbox alive while the page is open. Each heartbeat
+// rolls the auto-terminate deadline to at least KEEPALIVE_WINDOW_MS ahead, so
+// the sandbox survives as long as heartbeats arrive and frees itself within the
+// window after the tab closes. extendTimeout only adds to the total (capped at
+// the plan's 24h), so we extend by just the shortfall and track the deadline.
+const KEEPALIVE_WINDOW_MS = 5 * 60 * 1000
+const MAX_SANDBOX_LIFETIME_MS = 24 * 60 * 60 * 1000
+
+export async function keepSessionAlive(id: string): Promise<void> {
+  const sandbox = getSandbox(id)
+  if (!sandbox) {
+    return
+  }
+
+  const session = getSession(id)
+  const startedAt = session ? Date.parse(session.createdAt) : Date.now()
+  const maxDeadline = startedAt + MAX_SANDBOX_LIFETIME_MS
+
+  const target = Math.min(Date.now() + KEEPALIVE_WINDOW_MS, maxDeadline)
+  const current = getKeepAliveDeadline(id) ?? 0
+  if (target <= current) {
+    return // still enough runway
+  }
+
+  try {
+    await sandbox.extendTimeout(target - current)
+    setKeepAliveDeadline(id, target)
+  } catch {
+    // Sandbox already gone or the 24h plan cap reached; nothing to do.
   }
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   ExternalLinkIcon,
@@ -53,6 +53,21 @@ export function Workspace({ id }: { id: string }) {
   const [input, setInput] = useState('')
   const [posting, setPosting] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+
+  // Keep the sandbox alive while this workspace is open. Heartbeat every 2
+  // minutes, well inside the server's 5-minute keepalive window, so a missed
+  // beat does not kill it; when the tab closes the sandbox frees itself within
+  // the window.
+  useEffect(() => {
+    const ping = () => {
+      void fetch(`/api/sessions/${id}/keepalive`, { method: 'POST' })
+    }
+    ping()
+    const interval = setInterval(ping, 2 * 60 * 1000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [id])
 
   const busy =
     state.status === 'creating' ||
