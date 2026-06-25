@@ -69,7 +69,7 @@ export function PendingImageAttachments({
       {attachments.map((attachment, index) => (
         <div
           key={attachment.id}
-          className="relative size-24 shrink-0 sm:size-28"
+          className="relative size-12 shrink-0 sm:size-14"
           title={`${attachment.file.name || `Image ${String(index + 1)}`} · ${formatBytes(
             attachment.file.size,
           )}`}
@@ -77,7 +77,7 @@ export function PendingImageAttachments({
           <div
             aria-label={attachment.file.name || `Image ${String(index + 1)}`}
             role="img"
-            className="bg-muted size-full rounded-2xl border bg-cover bg-center shadow-sm"
+            className="bg-muted size-full rounded-xl border bg-cover bg-center shadow-sm"
             style={{ backgroundImage: imageBackground(attachment.url) }}
           />
           <button
@@ -85,14 +85,14 @@ export function PendingImageAttachments({
             disabled={disabled}
             aria-label="Remove image"
             className={cn(
-              'bg-background/95 text-foreground absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm',
+              'bg-background/95 text-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm',
               'transition-colors hover:bg-background disabled:opacity-50',
             )}
             onClick={() => {
               onRemove(attachment.id)
             }}
           >
-            <XIcon className="size-3.5" />
+            <XIcon className="size-3" />
           </button>
         </div>
       ))}
