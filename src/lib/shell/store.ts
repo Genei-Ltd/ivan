@@ -66,6 +66,13 @@ export function setSandbox(id: string, sandbox: Sandbox | undefined): void {
   }
 }
 
+export function setSandboxName(id: string, sandboxName: string): void {
+  const r = runtimes.get(id)
+  if (r) {
+    r.session.sandboxName = sandboxName
+  }
+}
+
 export function getKeepAliveDeadline(id: string): number | undefined {
   return runtimes.get(id)?.keepAliveDeadline
 }
@@ -121,6 +128,9 @@ export function emit(id: string, event: ShellEvent): void {
   switch (event.kind) {
     case 'status':
       r.session.status = event.status
+      if (event.status !== 'error') {
+        r.session.error = undefined
+      }
       break
     case 'log':
       r.session.logs.push(event.entry)

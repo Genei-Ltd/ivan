@@ -12,6 +12,10 @@ import { getAuthenticatedGitHubIdentity } from './github'
 import { getEnv } from '@/lib/env'
 import { installClaudeSkills } from './skill-installer'
 
+export function sandboxNameForSession(sessionId: string): string {
+  return `ivan-${sessionId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`
+}
+
 // Embed the GitHub token so the cloned repo can be pushed back to later.
 function authenticatedRepoUrl(repoUrl: string, token: string): string {
   try {
@@ -91,17 +95,36 @@ async function installPsql(
   await logger.error('Could not install psql; SQL access may be unavailable')
 }
 
+async function ensurePackageManagerAvailable(
+  sandbox: Sandbox,
+  packageManager: PackageManager,
+  logger: SessionLogger,
+): Promise<void> {
+  if (packageManager !== 'pnpm') {
+    return
+  }
+
+  const hasPnpm = await runInProject(sandbox, 'which', ['pnpm'])
+  if (!hasPnpm.success) {
+    await logger.info('Installing pnpm…')
+    await runInProject(sandbox, 'npm', ['install', '-g', 'pnpm'])
+  }
+}
+
 // Provision a sandbox: clone the locked repo, install deps + the agent, create
 // the session branch, and start the dev server on an exposed port. Returns the
 // public preview domain and the branch name. Node-only path.
 export async function createSandbox(
   branch: string,
+  sandboxName: string,
   logger: SessionLogger,
 ): Promise<SandboxResult & { sandbox?: Sandbox }> {
   const env = getEnv()
   try {
-    await logger.info('Creating sandbox…')
+    await logger.info('Creating persistent sandbox…')
     const sandbox = await Sandbox.create({
+      name: sandboxName,
+      persistent: true,
       teamId: env.SANDBOX_VERCEL_TEAM_ID,
       projectId: env.SANDBOX_VERCEL_PROJECT_ID,
       token: env.SANDBOX_VERCEL_TOKEN,
@@ -110,7 +133,7 @@ export async function createSandbox(
       runtime: 'node22',
       resources: { vcpus: 4 },
     })
-    await logger.info('Sandbox created')
+    await logger.info(`Sandbox created: ${sandbox.name}`)
 
     // Clone the repo into PROJECT_DIR with the token embedded for later push.
     await runCommandInSandbox(sandbox, 'mkdir', ['-p', PROJECT_DIR])
@@ -134,13 +157,7 @@ export async function createSandbox(
     let packageManager: PackageManager = 'npm'
     if ((await runInProject(sandbox, 'test', ['-f', 'package.json'])).success) {
       packageManager = await detectPackageManager(sandbox, logger)
-      if (packageManager === 'pnpm') {
-        const hasPnpm = await runInProject(sandbox, 'which', ['pnpm'])
-        if (!hasPnpm.success) {
-          await logger.info('Installing pnpm…')
-          await runInProject(sandbox, 'npm', ['install', '-g', 'pnpm'])
-        }
-      }
+      await ensurePackageManagerAvailable(sandbox, packageManager, logger)
       const install = await installDependencies(sandbox, packageManager, logger)
       if (!install.success && packageManager !== 'npm') {
         await logger.info('Falling back to npm install')
@@ -208,6 +225,86 @@ export async function createSandbox(
   }
 }
 
+async function devServerIsListening(
+  sandbox: Sandbox,
+  port: number,
+): Promise<boolean> {
+  const result = await runCommandInSandbox(sandbox, 'sh', [
+    '-c',
+    `curl -s -o /dev/null --max-time 2 http://localhost:${String(port)}`,
+  ])
+  return result.success
+}
+
+async function domainForDevPort(
+  sandbox: Sandbox,
+  port: number,
+): Promise<string> {
+  try {
+    return sandbox.domain(port)
+  } catch {
+    await sandbox.update({ ports: [port] })
+    return sandbox.domain(port)
+  }
+}
+
+export async function resumeSandbox(
+  sandboxName: string,
+  logger: SessionLogger,
+): Promise<SandboxResult & { sandbox?: Sandbox }> {
+  const env = getEnv()
+  try {
+    await logger.info(`Resuming sandbox ${sandboxName}…`)
+    const sandbox = await Sandbox.get({
+      name: sandboxName,
+      resume: true,
+      teamId: env.SANDBOX_VERCEL_TEAM_ID,
+      projectId: env.SANDBOX_VERCEL_PROJECT_ID,
+      token: env.SANDBOX_VERCEL_TOKEN,
+    })
+
+    if (!sandbox.persistent) {
+      await logger.error('Sandbox is not persistent and cannot be resumed')
+      return {
+        success: false,
+        error:
+          'This sandbox was not created as persistent; start a new session.',
+        sandbox,
+      }
+    }
+
+    await logger.info(`Sandbox resumed: ${sandbox.name}`)
+
+    const hasProject = await runInProject(sandbox, 'test', [
+      '-f',
+      'package.json',
+    ])
+    if (!hasProject.success) {
+      await logger.error('Resumed sandbox is missing the project checkout')
+      return {
+        success: false,
+        error: 'The sandbox resumed, but its project checkout is unavailable.',
+        sandbox,
+      }
+    }
+
+    const packageManager = await detectPackageManager(sandbox, logger)
+    await ensurePackageManagerAvailable(sandbox, packageManager, logger)
+
+    const domain = await domainForDevPort(sandbox, env.SANDBOX_DEV_PORT)
+    await startDevServer(sandbox, packageManager, domain, logger)
+
+    await logger.success('Preview is live')
+    return { success: true, sandbox, domain }
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : 'Failed to resume sandbox',
+    }
+  }
+}
+
 async function startDevServer(
   sandbox: Sandbox,
   packageManager: PackageManager,
@@ -245,6 +342,11 @@ async function startDevServer(
   // reach it (a process on 127.0.0.1 only, or that drifted to 3001, would 502
   // with SANDBOX_NOT_LISTENING).
   const port = String(env.SANDBOX_DEV_PORT)
+  if (await devServerIsListening(sandbox, env.SANDBOX_DEV_PORT)) {
+    await logger.success('Dev server is listening')
+    return
+  }
+
   const nextArgs = [
     '-p',
     port,

@@ -31,7 +31,7 @@
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://yourdomain.com/api/webhooks/slack",
+      "request_url": "https://ivan-v.vercel.app/api/webhooks/slack",
       "bot_events": [
         "app_mention",
         "assistant_thread_context_changed",
@@ -45,7 +45,7 @@
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "https://your-domain.com/api/webhooks/slack"
+      "request_url": "https://ivan-v.vercel.app/api/webhooks/slack"
     },
     "org_deploy_enabled": false,
     "socket_mode_enabled": false,

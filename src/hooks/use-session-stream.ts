@@ -13,6 +13,7 @@ export interface StreamState {
   messages: ChatMessage[]
   logs: LogEntry[]
   previewUrl?: string
+  previewVersion: number
   prUrl?: string
   error?: string
   notFound: boolean
@@ -22,13 +23,18 @@ const initialState: StreamState = {
   status: 'connecting',
   messages: [],
   logs: [],
+  previewVersion: 0,
   notFound: false,
 }
 
 function reduce(state: StreamState, event: ShellEvent): StreamState {
   switch (event.kind) {
     case 'status':
-      return { ...state, status: event.status }
+      return {
+        ...state,
+        status: event.status,
+        error: event.status === 'error' ? state.error : undefined,
+      }
     case 'log':
       return { ...state, logs: [...state.logs, event.entry] }
     case 'message': {
@@ -42,7 +48,11 @@ function reduce(state: StreamState, event: ShellEvent): StreamState {
       return { ...state, messages }
     }
     case 'preview':
-      return { ...state, previewUrl: event.url }
+      return {
+        ...state,
+        previewUrl: event.url,
+        previewVersion: state.previewVersion + 1,
+      }
     case 'pr':
       return { ...state, prUrl: event.url }
     case 'error':

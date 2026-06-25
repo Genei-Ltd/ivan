@@ -11,6 +11,7 @@ export interface LogEntry {
 
 export type SessionStatus =
   | 'creating' // sandbox spinning up, repo cloning, deps installing
+  | 'resuming' // stopped sandbox reattaching and preview restarting
   | 'ready' // dev server up, agent idle, awaiting input
   | 'working' // agent running a turn
   | 'submitting' // committing, pushing, opening PR
@@ -78,6 +79,7 @@ export interface Session {
   repoUrl: string
   baseBranch: string
   branch: string
+  sandboxName?: string
   previewUrl?: string
   prUrl?: string
   error?: string

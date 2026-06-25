@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react'
-import { GitPullRequestIcon, SendIcon } from 'lucide-react'
+import { GitPullRequestIcon, RotateCcwIcon, SendIcon } from 'lucide-react'
 import type { SessionStatus } from '@/lib/shell/types'
 import type { useImageAttachments } from '@/hooks/use-image-attachments'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,7 @@ export function WorkspaceComposer({
   prUrl,
   status,
   onInputChange,
+  onResume,
   onSend,
   onSubmit,
 }: {
@@ -28,11 +29,13 @@ export function WorkspaceComposer({
   prUrl?: string
   status: SessionStatus | 'connecting'
   onInputChange: (value: string) => void
+  onResume: () => void
   onSend: () => void
   onSubmit: () => void
 }) {
   const sendingLocked = busy || posting
   const canSend = !sendingLocked && Boolean(input.trim())
+  const canResume = status === 'stopped' || status === 'error'
 
   return (
     <div className="p-4">
@@ -92,6 +95,17 @@ export function WorkspaceComposer({
                   <GitPullRequestIcon className="size-4" />
                   View PR
                 </a>
+              </Button>
+            ) : canResume ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={onResume}
+                disabled={busy || posting}
+              >
+                <RotateCcwIcon className="size-4" />
+                Resume
               </Button>
             ) : (
               <Button

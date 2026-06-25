@@ -18,6 +18,7 @@ import { Toaster } from '@/components/ui/sonner'
 function isBusy(status: SessionStatus | 'connecting'): boolean {
   return (
     status === 'creating' ||
+    status === 'resuming' ||
     status === 'working' ||
     status === 'submitting' ||
     status === 'connecting'
@@ -103,6 +104,25 @@ export function Workspace({ id }: { id: string }) {
     }
   }
 
+  async function resume() {
+    if (busy || posting) {
+      return
+    }
+    setPosting(true)
+    try {
+      const res = await fetch(`/api/sessions/${id}/resume`, { method: 'POST' })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        throw new Error(data.error ?? 'Failed to resume')
+      }
+      toast.info('Resuming sandbox…')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to resume')
+    } finally {
+      setPosting(false)
+    }
+  }
+
   if (state.notFound) {
     return <WorkspaceNotFound />
   }
@@ -128,6 +148,7 @@ export function Workspace({ id }: { id: string }) {
       prUrl={state.prUrl}
       status={state.status}
       onInputChange={setInput}
+      onResume={() => void resume()}
       onSend={() => void send()}
       onSubmit={() => void submit()}
     />
@@ -151,7 +172,10 @@ export function Workspace({ id }: { id: string }) {
         previewPanel={
           <WorkspacePreview
             logs={state.logs}
+            onResume={() => void resume()}
             previewUrl={state.previewUrl}
+            previewVersion={state.previewVersion}
+            resumeDisabled={busy || posting}
             status={state.status}
           />
         }

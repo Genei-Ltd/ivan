@@ -12,6 +12,7 @@ interface SlackThreadState {
 
 const BUSY_STATUSES = new Set<SessionStatus>([
   'creating',
+  'resuming',
   'working',
   'submitting',
 ])
@@ -38,6 +39,8 @@ function statusMessage(status: SessionStatus): string {
   switch (status) {
     case 'creating':
       return 'Ivan is still provisioning the workspace.'
+    case 'resuming':
+      return 'Ivan is resuming the workspace.'
     case 'working':
       return 'Ivan is still working on the previous message.'
     case 'submitting':

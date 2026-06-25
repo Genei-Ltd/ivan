@@ -12,11 +12,12 @@ import {
   setKeepAliveDeadline,
   setMessage,
   setSandbox,
+  setSandboxName,
   storeImageAttachments,
 } from './store'
 import { createSessionLogger } from './logger'
 import { branchNameFromPrompt } from './branch'
-import { createSandbox } from './creation'
+import { createSandbox, resumeSandbox, sandboxNameForSession } from './creation'
 import { executeClaudeInSandbox } from './agent'
 import { pushChangesToBranch } from './git'
 import { createPullRequest } from './github'
@@ -35,6 +36,7 @@ export function createSession(
   const env = getEnv()
   const id = randomUUID()
   const branch = branchNameFromPrompt(prompt)
+  const sandboxName = sandboxNameForSession(id)
   const firstMessage = {
     id: randomUUID(),
     role: 'user' as const,
@@ -49,6 +51,7 @@ export function createSession(
     repoUrl: env.TARGET_REPO_URL,
     baseBranch: env.TARGET_REPO_BRANCH,
     branch,
+    sandboxName,
     messages: [firstMessage],
     logs: [],
     createdAt: new Date().toISOString(),
@@ -75,9 +78,13 @@ async function provisionAndRun(
     return
   }
 
-  const result = await createSandbox(session.branch, logger)
+  const sandboxName = session.sandboxName ?? sandboxNameForSession(id)
+  setSandboxName(id, sandboxName)
+
+  const result = await createSandbox(session.branch, sandboxName, logger)
   if (result.sandbox) {
     setSandbox(id, result.sandbox)
+    setSandboxName(id, result.sandbox.name)
     // The sandbox starts with the base timeout; track its deadline so the
     // workspace keepalive can roll it forward while the page is open.
     setKeepAliveDeadline(id, Date.now() + getEnv().SANDBOX_TIMEOUT_MS)
@@ -95,6 +102,45 @@ async function provisionAndRun(
   emit(id, { kind: 'status', status: 'ready' })
 
   await runAgentTurn(id, prompt, attachments)
+}
+
+export async function resumeSession(id: string): Promise<void> {
+  const logger = createSessionLogger(id)
+  const session = getSession(id)
+  if (!session) {
+    throw new Error('Session not found')
+  }
+
+  const sandboxName = session.sandboxName ?? getSandbox(id)?.name
+  if (!sandboxName) {
+    emit(id, {
+      kind: 'error',
+      message: 'No persistent sandbox name is available for this session.',
+    })
+    emit(id, { kind: 'status', status: 'error' })
+    return
+  }
+
+  emit(id, { kind: 'status', status: 'resuming' })
+  setSandboxName(id, sandboxName)
+
+  const result = await resumeSandbox(sandboxName, logger)
+  if (result.sandbox) {
+    setSandbox(id, result.sandbox)
+    setSandboxName(id, result.sandbox.name)
+    setKeepAliveDeadline(id, Date.now() + getEnv().SANDBOX_TIMEOUT_MS)
+  }
+
+  if (!result.success || !result.sandbox) {
+    emit(id, { kind: 'error', message: result.error ?? 'Resume failed' })
+    emit(id, { kind: 'status', status: 'error' })
+    return
+  }
+
+  if (result.domain) {
+    emit(id, { kind: 'preview', url: result.domain })
+  }
+  emit(id, { kind: 'status', status: 'ready' })
 }
 
 // Run one agent turn against the session's sandbox, streaming the assistant

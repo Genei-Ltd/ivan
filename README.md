@@ -11,7 +11,7 @@ Ivan (a play on Aiven) is a self-hostable, Lovable-style shell: describe a chang
 - `src/lib/shell/` — the engine: provision a sandbox, clone the target repo, install deps + the Claude Code CLI, start `next dev` on an exposed port, run the agent (stream-json), commit/push, open the PR.
 - `src/lib/shell/claude-skills/` — Ivan-owned Claude Code skills copied into the sandbox as `~/.claude/skills/*` before each agent run.
 - `src/lib/shell/store.ts` — in-memory sessions + a per-session SSE event bus.
-- `src/app/api/sessions/**` — create / list / event-stream / message / submit.
+- `src/app/api/sessions/**` — create / list / event-stream / message / resume / submit.
 - `src/app/page.tsx` + `src/app/workspace/[id]` — launcher and the chat-plus-live-preview workspace.
 
 The agent runs **inside** the sandbox (the same model as a local coding agent), so its secrets live in the sandbox. Suitable for an internal, single-process deployment.
@@ -39,6 +39,8 @@ Next.js 16 defaults to Turbopack, whose HMR can be unreliable behind the sandbox
 Before booting a Next 16 target app, Ivan also adds the sandbox preview host to that app's `allowedDevOrigins` so `/_next` dev resources can load from the public `sb-*.vercel.run` iframe, and injects `devIndicators: false` so the preview iframe does not show Next's development indicator.
 
 Those runtime preview config edits are marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
+
+Ivan creates named persistent Vercel Sandboxes for new sessions. If a sandbox stops, the workspace can reattach by name and restart the dev server while the Ivan session record still exists in memory.
 
 ## What's Included
 

@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.28.1",
   "scripts": {
-    "dev": "next dev --port 49383",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0 .",

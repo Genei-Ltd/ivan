@@ -3,6 +3,7 @@ import type { SessionStatus } from '@/lib/shell/types'
 export const STATUS_LABEL: Record<SessionStatus | 'connecting', string> = {
   connecting: 'Connecting',
   creating: 'Provisioning',
+  resuming: 'Resuming',
   ready: 'Ready',
   working: 'Working',
   submitting: 'Opening PR',
