@@ -1,4 +1,3 @@
-import type { RefObject } from 'react'
 import { ExternalLinkIcon, Loader2Icon, TerminalIcon } from 'lucide-react'
 import type { LogEntry, SessionStatus } from '@/lib/shell/types'
 import { Button } from '@/components/ui/button'
@@ -6,12 +5,10 @@ import { ActivityLog } from '@/components/workspace/workspace-activity'
 import { STATUS_LABEL } from '@/components/workspace/workspace-status'
 
 export function WorkspacePreview({
-  logEndRef,
   logs,
   previewUrl,
   status,
 }: {
-  logEndRef: RefObject<HTMLDivElement | null>
   logs: LogEntry[]
   previewUrl?: string
   status: SessionStatus | 'connecting'
@@ -51,7 +48,6 @@ export function WorkspacePreview({
               <ActivityLog
                 className="border-t-0 bg-background/70"
                 contentClassName="py-3"
-                logEndRef={logEndRef}
                 logs={logs}
               />
             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   ChevronRightIcon,
   DatabaseIcon,
@@ -13,24 +13,12 @@ import {
   WrenchIcon,
 } from 'lucide-react'
 import type { ChatMessage, ToolCallPart } from '@/lib/shell/types'
+import { useStickToBottom } from '@/hooks/use-stick-to-bottom'
 import { cn } from '@/lib/utils'
 import { normalizeKnownSlackMentions } from '@/lib/slack/mentions'
 import { MessageImageAttachments } from '@/components/workspace/image-attachments'
 import { Markdown } from '@/components/workspace/markdown'
 import { ScrollArea } from '@/components/ui/scroll-area'
-
-const BOTTOM_STICKINESS_THRESHOLD = 48
-
-function isNearBottom(element: HTMLElement) {
-  return (
-    element.scrollHeight - element.scrollTop - element.clientHeight <=
-    BOTTOM_STICKINESS_THRESHOLD
-  )
-}
-
-function scrollToBottom(element: HTMLElement) {
-  element.scrollTop = element.scrollHeight
-}
 
 function ToolIcon({
   part,
@@ -204,39 +192,14 @@ export function WorkspaceMessages({
   error?: string
   messages: ChatMessage[]
 }) {
-  const viewportRef = useRef<HTMLDivElement>(null)
-  const shouldStickToBottomRef = useRef(true)
-
-  function handleScroll() {
-    const viewport = viewportRef.current
-    if (!viewport) {
-      return
-    }
-    shouldStickToBottomRef.current = isNearBottom(viewport)
-  }
-
-  useEffect(() => {
-    if (!shouldStickToBottomRef.current) {
-      return
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      const viewport = viewportRef.current
-      if (viewport && shouldStickToBottomRef.current) {
-        scrollToBottom(viewport)
-      }
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-    }
-  }, [error, messages])
+  const { onViewportScroll, viewportRef } = useStickToBottom(messages, error)
 
   return (
     <div className="h-full min-h-0 flex-1">
       <ScrollArea
         className="size-full [&_[data-slot=scroll-area-viewport]>div]:block!"
         viewportRef={viewportRef}
-        viewportProps={{ onScroll: handleScroll }}
+        viewportProps={{ onScroll: onViewportScroll }}
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
           {messages.map((message) =>

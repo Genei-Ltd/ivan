@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useImageAttachments } from '@/hooks/use-image-attachments'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSessionStream } from '@/hooks/use-session-stream'
 import type { SessionStatus } from '@/lib/shell/types'
 import {
@@ -32,25 +33,17 @@ function isBusy(status: SessionStatus | 'connecting'): boolean {
   )
 }
 
-function scrollRefIntoView(ref: RefObject<HTMLDivElement | null>) {
-  const reducedMotion = window.matchMedia(
-    '(prefers-reduced-motion: reduce)',
-  ).matches
-  ref.current?.scrollIntoView({
-    block: 'end',
-    behavior: reducedMotion ? 'auto' : 'smooth',
-  })
-}
+const DESKTOP_CHAT_DEFAULT_SIZE = '400px'
+const DESKTOP_CHAT_MIN_SIZE = '352px'
+const DESKTOP_LAYOUT_QUERY = '(min-width: 768px)'
 
 export function Workspace({ id }: { id: string }) {
   const state = useSessionStream(id)
   const [input, setInput] = useState('')
   const [posting, setPosting] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
+  const isDesktop = useMediaQuery(DESKTOP_LAYOUT_QUERY)
   const imageAttachments = useImageAttachments()
-  const logEndRef = useRef<HTMLDivElement>(null)
-  const previewLogEndRef = useRef<HTMLDivElement>(null)
 
   // Keep the sandbox alive while this workspace is open. Heartbeat every 2
   // minutes, well inside the server's 5-minute keepalive window, so a missed
@@ -66,43 +59,6 @@ export function Workspace({ id }: { id: string }) {
       clearInterval(interval)
     }
   }, [id])
-
-  useEffect(() => {
-    const media = window.matchMedia('(min-width: 768px)')
-    const updateLayout = () => {
-      setIsDesktop(media.matches)
-    }
-
-    updateLayout()
-    media.addEventListener('change', updateLayout)
-    return () => {
-      media.removeEventListener('change', updateLayout)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!showLogs) {
-      return
-    }
-    const frame = window.requestAnimationFrame(() => {
-      scrollRefIntoView(logEndRef)
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-    }
-  }, [showLogs, state.logs.length])
-
-  useEffect(() => {
-    if (state.previewUrl) {
-      return
-    }
-    const frame = window.requestAnimationFrame(() => {
-      scrollRefIntoView(previewLogEndRef)
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-    }
-  }, [state.previewUrl, state.logs.length])
 
   const busy = isBusy(state.status)
   const mainPanelOrientation = isDesktop ? 'horizontal' : 'vertical'
@@ -176,6 +132,7 @@ export function Workspace({ id }: { id: string }) {
   )
   const activityToggle = (
     <ActivityToggle
+      active={busy}
       logCount={state.logs.length}
       onToggle={() => {
         setShowLogs((v) => !v)
@@ -191,8 +148,8 @@ export function Workspace({ id }: { id: string }) {
         className="h-svh"
       >
         <ResizablePanel
-          defaultSize={isDesktop ? '25rem' : '50%'}
-          minSize={isDesktop ? '22rem' : '30%'}
+          defaultSize={isDesktop ? DESKTOP_CHAT_DEFAULT_SIZE : '50%'}
+          minSize={isDesktop ? DESKTOP_CHAT_MIN_SIZE : '30%'}
           maxSize={isDesktop ? '72%' : '75%'}
           className="min-h-0 min-w-0"
         >
@@ -220,7 +177,7 @@ export function Workspace({ id }: { id: string }) {
                 >
                   <div className="flex size-full flex-col border-t">
                     {activityToggle}
-                    <ActivityLog logEndRef={logEndRef} logs={state.logs} />
+                    <ActivityLog logs={state.logs} />
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -250,12 +207,11 @@ export function Workspace({ id }: { id: string }) {
         <ResizableHandle />
 
         <ResizablePanel
-          defaultSize={isDesktop ? '58%' : '50%'}
-          minSize={isDesktop ? '22rem' : '25%'}
+          defaultSize={isDesktop ? undefined : '50%'}
+          minSize={isDesktop ? DESKTOP_CHAT_MIN_SIZE : '25%'}
           className="min-h-0 min-w-0"
         >
           <WorkspacePreview
-            logEndRef={previewLogEndRef}
             logs={state.logs}
             previewUrl={state.previewUrl}
             status={state.status}

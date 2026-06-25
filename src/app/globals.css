@@ -448,6 +448,9 @@
 @utility animate-log-entry {
   animation: log-entry-in 180ms ease-out both;
 }
+@utility animate-shimmer-reverse {
+  animation: shimmer 2s linear infinite reverse;
+}
 
 /* Eyebrow / kicker label */
 @utility eyebrow {
