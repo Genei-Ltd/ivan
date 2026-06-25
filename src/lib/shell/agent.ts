@@ -105,7 +105,7 @@ function toolCallPart(
     provider = PROVIDER_LABELS[server] ?? humanise(server)
     action = humanise(segments.slice(2).join('_') || name)
   } else {
-    provider = 'Claude'
+    provider = 'Ivan'
     action = humanise(name)
   }
 
@@ -149,7 +149,7 @@ export async function executeClaudeInSandbox(
     return {
       success: false,
       changesDetected: false,
-      error: 'Claude CLI not found in sandbox',
+      error: 'Ivan Harness not found in sandbox',
     }
   }
 
@@ -241,7 +241,12 @@ export async function executeClaudeInSandbox(
   // Prompt arrives via $AGENT_PROMPT so quotes/newlines can't break the shell.
   const command = `claude ${flags.join(' ')} -- "$AGENT_PROMPT"`
 
-  await logger.command(`claude ${flags.join(' ')} -- "<prompt>"`)
+  // Log a branded, redacted invocation so the activity pane never leaks the
+  // underlying binary or model id.
+  const loggedFlags = flags.map((flag) =>
+    flag.startsWith('--model') ? '--model <model>' : flag,
+  )
+  await logger.command(`ivan ${loggedFlags.join(' ')} -- "<prompt>"`)
 
   // The assistant turn as ordered parts: text segments interleaved with tool
   // calls. tool_use blocks append a running tool part; the matching tool_result
@@ -401,7 +406,9 @@ export async function executeClaudeInSandbox(
     }
 
     if (finished.exitCode !== 0) {
-      await logger.error(`Claude exited with code ${String(finished.exitCode)}`)
+      await logger.error(
+        `Ivan Harness exited with code ${String(finished.exitCode)}`,
+      )
     }
 
     const status = await runInProject(sandbox, 'git', ['status', '--porcelain'])
@@ -423,7 +430,7 @@ export async function executeClaudeInSandbox(
       error:
         error instanceof Error
           ? error.message
-          : 'Failed to execute Claude in sandbox',
+          : 'Failed to execute Ivan in sandbox',
     }
   }
 }

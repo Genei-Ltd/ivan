@@ -31,10 +31,10 @@ async function installClaudeCLI(
 ): Promise<boolean> {
   const existing = await runCommandInSandbox(sandbox, 'which', ['claude'])
   if (existing.success && existing.output?.includes('claude')) {
-    await logger.info('Claude CLI already installed')
+    await logger.info('Ivan Harness already installed')
     return true
   }
-  await logger.info('Installing Claude CLI…')
+  await logger.info('Installing Ivan Harness…')
   const install = await runCommandInSandbox(sandbox, 'sh', [
     '-c',
     'curl -fsSL https://claude.ai/install.sh | bash',
@@ -46,10 +46,10 @@ async function installClaudeCLI(
     'ln -sf $HOME/.local/bin/claude /usr/local/bin/claude 2>/dev/null || true',
   ])
   if (install.success) {
-    await logger.info('Claude CLI installed')
+    await logger.info('Ivan Harness installed')
     return true
   }
-  await logger.error('Failed to install Claude CLI')
+  await logger.error('Failed to install Ivan Harness')
   return false
 }
 
@@ -150,7 +150,11 @@ export async function createSandbox(
     // Install the coding agent.
     const claudeReady = await installClaudeCLI(sandbox, logger)
     if (!claudeReady) {
-      return { success: false, error: 'Failed to install Claude CLI', sandbox }
+      return {
+        success: false,
+        error: 'Failed to install Ivan Harness',
+        sandbox,
+      }
     }
 
     // Postgres client so the agent can connect to an Aiven fork and run SQL.
