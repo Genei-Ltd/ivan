@@ -4,6 +4,7 @@ import { useEffect, useReducer } from 'react'
 import type {
   ChatMessage,
   LogEntry,
+  Session,
   SessionStatus,
   ShellEvent,
 } from '@/lib/shell/types'
@@ -62,11 +63,63 @@ function reduce(state: StreamState, event: ShellEvent): StreamState {
   }
 }
 
-type Action = { type: 'event'; event: ShellEvent } | { type: 'notfound' }
+function messageSize(message: ChatMessage): number {
+  return JSON.stringify(message).length
+}
+
+function mergeMessage(existing: ChatMessage | undefined, next: ChatMessage) {
+  if (
+    existing?.role === 'assistant' &&
+    next.role === 'assistant' &&
+    messageSize(existing) > messageSize(next)
+  ) {
+    return existing
+  }
+  return next
+}
+
+function reduceSnapshot(state: StreamState, session: Session): StreamState {
+  const messagesById = new Map(
+    state.messages.map((message) => [message.id, message]),
+  )
+  for (const message of session.messages) {
+    messagesById.set(
+      message.id,
+      mergeMessage(messagesById.get(message.id), message),
+    )
+  }
+
+  const previewUrl = session.previewUrl
+  return {
+    ...state,
+    status: session.status,
+    messages: [...messagesById.values()],
+    logs:
+      session.logs.length > state.logs.length
+        ? [...state.logs, ...session.logs.slice(state.logs.length)]
+        : state.logs,
+    previewUrl,
+    previewVersion:
+      previewUrl && previewUrl !== state.previewUrl
+        ? state.previewVersion + 1
+        : state.previewVersion,
+    prUrl: session.prUrl,
+    error: session.error,
+    notFound: false,
+  }
+}
+
+type Action =
+  | { type: 'event'; event: ShellEvent }
+  | { type: 'snapshot'; session: Session }
+  | { type: 'notfound' }
 
 function reducer(state: StreamState, action: Action): StreamState {
   if (action.type === 'notfound') {
     return { ...state, notFound: true }
+  }
+  if (action.type === 'snapshot') {
+    return reduceSnapshot(state, action.session)
   }
   return reduce(state, action.event)
 }
@@ -93,6 +146,42 @@ export function useSessionStream(id: string): StreamState {
 
     return () => {
       source.close()
+    }
+  }, [id])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const refresh = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${id}`)
+        if (cancelled) {
+          return
+        }
+        if (res.status === 404) {
+          dispatch({ type: 'notfound' })
+          return
+        }
+        if (!res.ok) {
+          return
+        }
+        const data = (await res.json()) as { session?: Session }
+        if (data.session) {
+          dispatch({ type: 'snapshot', session: data.session })
+        }
+      } catch {
+        // EventSource remains the primary live transport; polling is fallback.
+      }
+    }
+
+    const interval = setInterval(() => {
+      void refresh()
+    }, 3000)
+    void refresh()
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
     }
   }, [id])
 

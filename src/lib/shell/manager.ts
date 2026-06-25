@@ -14,6 +14,7 @@ import {
   setSandbox,
   setSandboxName,
   storeImageAttachments,
+  waitForSessionPersistence,
 } from './store'
 import { createSessionLogger } from './logger'
 import { branchNameFromPrompt } from './branch'
@@ -260,8 +261,7 @@ async function runAgentTurn(
   emit(id, { kind: 'status', status: 'ready' })
 }
 
-// Handle a follow-up chat message: record it and run another agent turn.
-export async function sendMessage(
+export async function recordUserMessage(
   id: string,
   content: string,
   attachments: UploadedImageAttachment[] = [],
@@ -279,6 +279,33 @@ export async function sendMessage(
       toChatImageAttachment(id, attachment),
     ),
   })
+  await waitForSessionPersistence(id)
+}
+
+export async function runRecordedMessageTurn(
+  id: string,
+  content: string,
+  attachments: UploadedImageAttachment[] = [],
+): Promise<void> {
+  try {
+    await runAgentTurn(id, content, attachments)
+  } catch (error: unknown) {
+    emit(id, {
+      kind: 'error',
+      message:
+        error instanceof Error ? error.message : 'Failed to run agent turn',
+    })
+    emit(id, { kind: 'status', status: 'error' })
+  }
+}
+
+// Handle a follow-up chat message: record it and run another agent turn.
+export async function sendMessage(
+  id: string,
+  content: string,
+  attachments: UploadedImageAttachment[] = [],
+): Promise<void> {
+  await recordUserMessage(id, content, attachments)
   await runAgentTurn(id, content, attachments)
 }
 

@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { ensureSessionLoaded } from '@/lib/shell/store'
-import { sendMessage } from '@/lib/shell/manager'
+import { recordUserMessage, runRecordedMessageTurn } from '@/lib/shell/manager'
 import { parseAgentRequest } from '@/lib/shell/request'
 
 export const runtime = 'nodejs'
@@ -20,9 +20,10 @@ export async function POST(
     return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
 
-  // The agent turn is long-running; progress streams over SSE. Fire and forget;
-  // failures surface to the client as SSE error events.
-  void sendMessage(id, parsed.content, parsed.attachments)
+  // Persist and stream the user bubble before responding; otherwise a
+  // serverless instance split can make the message appear only after reload.
+  await recordUserMessage(id, parsed.content, parsed.attachments)
+  after(() => runRecordedMessageTurn(id, parsed.content, parsed.attachments))
 
   return NextResponse.json({ ok: true }, { status: 202 })
 }
