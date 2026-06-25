@@ -1,27 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { useImageAttachments } from '@/hooks/use-image-attachments'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSessionStream } from '@/hooks/use-session-stream'
 import type { SessionStatus } from '@/lib/shell/types'
-import {
-  ActivityLog,
-  ActivityToggle,
-} from '@/components/workspace/workspace-activity'
+import { ActivityToggle } from '@/components/workspace/workspace-activity'
+import { WorkspaceChatPanel } from '@/components/workspace/workspace-chat-panel'
 import { WorkspaceComposer } from '@/components/workspace/workspace-composer'
-import { WorkspaceHeader } from '@/components/workspace/workspace-header'
 import { WorkspaceMessages } from '@/components/workspace/workspace-messages'
+import { WorkspaceNotFound } from '@/components/workspace/workspace-not-found'
 import { WorkspacePreview } from '@/components/workspace/workspace-preview'
-import { Button } from '@/components/ui/button'
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import { Separator } from '@/components/ui/separator'
+import { WorkspaceShell } from '@/components/workspace/workspace-shell'
 import { Toaster } from '@/components/ui/sonner'
 
 function isBusy(status: SessionStatus | 'connecting'): boolean {
@@ -33,8 +24,6 @@ function isBusy(status: SessionStatus | 'connecting'): boolean {
   )
 }
 
-const DESKTOP_CHAT_DEFAULT_SIZE = '400px'
-const DESKTOP_CHAT_MIN_SIZE = '352px'
 const DESKTOP_LAYOUT_QUERY = '(min-width: 768px)'
 
 export function Workspace({ id }: { id: string }) {
@@ -61,7 +50,6 @@ export function Workspace({ id }: { id: string }) {
   }, [id])
 
   const busy = isBusy(state.status)
-  const mainPanelOrientation = isDesktop ? 'horizontal' : 'vertical'
 
   async function send() {
     const content = input.trim()
@@ -116,15 +104,7 @@ export function Workspace({ id }: { id: string }) {
   }
 
   if (state.notFound) {
-    return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4">
-        <h1 className="text-2xl font-semibold">Session not found</h1>
-        <p className="text-muted-foreground">It may have been torn down.</p>
-        <Button asChild variant="outline">
-          <Link href="/">Start a new session</Link>
-        </Button>
-      </div>
-    )
+    return <WorkspaceNotFound />
   }
 
   const messages = (
@@ -139,85 +119,43 @@ export function Workspace({ id }: { id: string }) {
       }}
     />
   )
+  const composer = (
+    <WorkspaceComposer
+      busy={busy}
+      imageAttachments={imageAttachments}
+      input={input}
+      posting={posting}
+      prUrl={state.prUrl}
+      status={state.status}
+      onInputChange={setInput}
+      onSend={() => void send()}
+      onSubmit={() => void submit()}
+    />
+  )
 
   return (
     <div className="h-svh">
-      <ResizablePanelGroup
-        key={mainPanelOrientation}
-        orientation={mainPanelOrientation}
-        className="h-svh"
-      >
-        <ResizablePanel
-          defaultSize={isDesktop ? DESKTOP_CHAT_DEFAULT_SIZE : '50%'}
-          minSize={isDesktop ? DESKTOP_CHAT_MIN_SIZE : '30%'}
-          maxSize={isDesktop ? '72%' : '75%'}
-          className="min-h-0 min-w-0"
-        >
-          <aside className="flex size-full flex-col border-b md:border-r md:border-b-0">
-            <WorkspaceHeader busy={busy} status={state.status} />
-
-            {showLogs ? (
-              <ResizablePanelGroup
-                orientation="vertical"
-                className="min-h-0 flex-1"
-              >
-                <ResizablePanel
-                  defaultSize="78%"
-                  minSize="35%"
-                  className="min-h-0"
-                >
-                  {messages}
-                </ResizablePanel>
-                <ResizableHandle />
-                <ResizablePanel
-                  defaultSize="22%"
-                  minSize="8rem"
-                  maxSize="55%"
-                  className="min-h-0"
-                >
-                  <div className="flex size-full flex-col border-t">
-                    {activityToggle}
-                    <ActivityLog logs={state.logs} />
-                  </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            ) : (
-              <>
-                {messages}
-                <div className="border-t">{activityToggle}</div>
-              </>
-            )}
-
-            <Separator />
-
-            <WorkspaceComposer
-              busy={busy}
-              imageAttachments={imageAttachments}
-              input={input}
-              posting={posting}
-              prUrl={state.prUrl}
-              status={state.status}
-              onInputChange={setInput}
-              onSend={() => void send()}
-              onSubmit={() => void submit()}
-            />
-          </aside>
-        </ResizablePanel>
-
-        <ResizableHandle />
-
-        <ResizablePanel
-          defaultSize={isDesktop ? undefined : '50%'}
-          minSize={isDesktop ? DESKTOP_CHAT_MIN_SIZE : '25%'}
-          className="min-h-0 min-w-0"
-        >
+      <WorkspaceShell
+        chatPanel={
+          <WorkspaceChatPanel
+            activityToggle={activityToggle}
+            busy={busy}
+            composer={composer}
+            logs={state.logs}
+            messages={messages}
+            showLogs={showLogs}
+            status={state.status}
+          />
+        }
+        isDesktop={isDesktop}
+        previewPanel={
           <WorkspacePreview
             logs={state.logs}
             previewUrl={state.previewUrl}
             status={state.status}
           />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        }
+      />
 
       <Toaster />
     </div>
