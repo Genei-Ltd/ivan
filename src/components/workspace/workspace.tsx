@@ -122,7 +122,7 @@ export function Workspace({ id }: { id: string }) {
     <div className="flex h-svh flex-col md:flex-row">
       {/* Left: chat + activity */}
       <aside className="flex h-1/2 w-full flex-col border-b md:h-full md:w-105 md:border-r md:border-b-0">
-        <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
           <Link href="/" className="text-sm font-semibold">
             Ivan
           </Link>
@@ -262,7 +262,7 @@ export function Workspace({ id }: { id: string }) {
 
       {/* Right: live preview */}
       <main className="relative flex h-1/2 flex-1 flex-col md:h-full">
-        <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
           <span className="text-sm font-medium">Preview</span>
           {state.previewUrl && (
             <Button asChild variant="ghost" size="sm">
