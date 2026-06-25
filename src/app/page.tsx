@@ -47,15 +47,15 @@ export default function Home() {
         <h1 className="text-3xl font-bold tracking-tight">
           Change production. Break nothing.
         </h1>
-        <p className="text-muted-foreground max-w-md text-balance">
+        <p className="text-muted-foreground max-w-2xl text-balance">
           Describe a change in plain English. Ivan makes it on a full-data fork
           of production, proves it works, then opens a PR. No customer is ever
           at risk.
         </p>
       </div>
 
-      <div className="w-full max-w-xl">
-        <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
+      <div className="w-full max-w-2xl">
+        <div className="bg-card focus-within:border-ring/60 mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border p-2.5 transition-colors">
           <Textarea
             value={prompt}
             onChange={(event) => {

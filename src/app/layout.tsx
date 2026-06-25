@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <>
       <html lang="en" suppressHydrationWarning className={fontVariables}>
-        <body className="typography-editorial min-h-svh antialiased">
+        <body className="typography-dense min-h-svh antialiased">
           <ThemeProvider
             attribute="class"
             defaultTheme="light"
