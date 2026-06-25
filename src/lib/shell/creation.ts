@@ -10,6 +10,7 @@ import type { SessionLogger } from './logger'
 import type { SandboxResult } from './types'
 import { getAuthenticatedGitHubIdentity } from './github'
 import { getEnv } from '@/lib/env'
+import { installClaudeSkills } from './skill-installer'
 
 // Embed the GitHub token so the cloned repo can be pushed back to later.
 function authenticatedRepoUrl(repoUrl: string, token: string): string {
@@ -155,6 +156,10 @@ export async function createSandbox(
         error: 'Failed to install Ivan Harness',
         sandbox,
       }
+    }
+    const skillsReady = await installClaudeSkills(sandbox, logger)
+    if (!skillsReady) {
+      return { success: false, error: 'Failed to install Ivan skills', sandbox }
     }
 
     // Postgres client so the agent can connect to an Aiven fork and run SQL.

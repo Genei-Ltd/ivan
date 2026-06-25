@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
   // React Compiler: automatic memoization, no manual React.memo/useMemo needed
   reactCompiler: true,
 
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./src/lib/shell/claude-skills/**/*'],
+  },
+
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
 }
 

@@ -9,6 +9,7 @@ Ivan (a play on Aiven) is a self-hostable, Lovable-style shell: describe a chang
 ### How it works
 
 - `src/lib/shell/` — the engine: provision a sandbox, clone the target repo, install deps + the Claude Code CLI, start `next dev` on an exposed port, run the agent (stream-json), commit/push, open the PR.
+- `src/lib/shell/claude-skills/` — Ivan-owned Claude Code skills copied into the sandbox as `~/.claude/skills/*` before each agent run.
 - `src/lib/shell/store.ts` — in-memory sessions + a per-session SSE event bus.
 - `src/app/api/sessions/**` — create / list / event-stream / message / submit.
 - `src/app/page.tsx` + `src/app/workspace/[id]` — launcher and the chat-plus-live-preview workspace.
