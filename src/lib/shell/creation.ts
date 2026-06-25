@@ -381,6 +381,12 @@ async function startDevServer(
   if (env.DATABASE_URL) {
     devEnv.DATABASE_URL = env.DATABASE_URL
   }
+  if (env.DATABASE_CA_CERT_BASE64) {
+    devEnv.DATABASE_CA_CERT_BASE64 = env.DATABASE_CA_CERT_BASE64
+  }
+  if (env.DATABASE_SSL) {
+    devEnv.DATABASE_SSL = env.DATABASE_SSL
+  }
 
   await sandbox.runCommand({
     cmd: 'sh',

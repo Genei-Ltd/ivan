@@ -26,6 +26,8 @@ const schema = z.object({
   // Durable Ivan session/Slack state, also injected into the sandbox so
   // full-stack changes and migrations run against a real Postgres.
   DATABASE_URL: z.string().optional(),
+  DATABASE_CA_CERT_BASE64: z.string().optional(),
+  DATABASE_SSL: z.string().optional(),
 
   // Aiven API token. Gives the in-sandbox agent the Aiven MCP server (via
   // `npx mcp-aiven`) so it can provision and inspect Aiven services live.
