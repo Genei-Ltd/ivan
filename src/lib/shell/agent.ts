@@ -16,6 +16,7 @@ import {
   type PreparedImageAttachment,
   type UploadedImageAttachment,
 } from './attachments'
+import { SANDBOX_MCP_PROXY_PATH, SANDBOX_MCP_TRACE_PATH } from './mcp-proxy'
 
 export interface RunClaudeOptions {
   sessionId: string
@@ -35,6 +36,17 @@ export interface RunClaudeOptions {
   // the agent can connect to a fork and run SQL directly. Dev/fork only; pair
   // with a fork-scoped token that cannot reach prod.
   aivenAllowSecrets?: boolean
+  // Demo mode: when set, the Aiven MCP runs behind the proxy, which redirects the
+  // agent's by-name calls (pg_read/write, connection info, status, metrics) onto
+  // this pre-warmed fork so its self-created fork transparently resolves to one
+  // that is already live. See src/lib/shell/demo.ts and the proxy script.
+  demoForkName?: string
+  demoForkProject?: string
+  // When true, the proxy fakes the fork-create response (no real throwaway).
+  demoFakeCreate?: boolean
+  // When true, the Aiven MCP server is launched through the proxy so a real
+  // run's JSON-RPC traffic is captured to a trace file in the sandbox.
+  traceMcp?: boolean
   logger: SessionLogger
   // Called on every streaming update with the assistant turn so far: the
   // concatenated text plus the ordered parts (text segments and tool calls).
@@ -136,6 +148,10 @@ export async function executeClaudeInSandbox(
     aivenToken,
     aivenReadOnly,
     aivenAllowSecrets,
+    demoForkName,
+    demoForkProject,
+    demoFakeCreate,
+    traceMcp,
     logger,
     onAssistantUpdate,
   } = opts
@@ -225,12 +241,31 @@ export async function executeClaudeInSandbox(
   // inherits AIVEN_TOKEN / AIVEN_READ_ONLY from the agent's environment. Merged
   // with the target repo's own .mcp.json rather than replacing it.
   if (aivenToken) {
+    // Trace mode or demo redirect runs mcp-aiven behind the proxy (which spawns
+    // `npx -y mcp-aiven` itself, writes JSON-RPC to IVAN_MCP_LOG, and in demo
+    // mode rewrites by-name calls onto the pre-warmed fork). Proxy and child
+    // inherit the AIVEN_* / IVAN_* vars below from this env.
+    const useProxy = Boolean(traceMcp) || Boolean(demoForkName)
+    const aivenServer = useProxy
+      ? { command: 'node', args: [SANDBOX_MCP_PROXY_PATH] }
+      : { command: 'npx', args: ['-y', 'mcp-aiven'] }
     env.AIVEN_MCP_CONFIG = JSON.stringify({
-      mcpServers: { aiven: { command: 'npx', args: ['-y', 'mcp-aiven'] } },
+      mcpServers: { aiven: aivenServer },
     })
     env.AIVEN_TOKEN = aivenToken
     env.AIVEN_READ_ONLY = aivenReadOnly ? 'true' : 'false'
     env.AIVEN_ALLOW_SECRETS = aivenAllowSecrets ? 'true' : 'false'
+    if (useProxy) {
+      // Always capture a trace when proxied so a run can be inspected after.
+      env.IVAN_MCP_LOG = SANDBOX_MCP_TRACE_PATH
+    }
+    if (demoForkName) {
+      env.IVAN_DEMO_FORK_NAME = demoForkName
+      if (demoForkProject) {
+        env.IVAN_DEMO_FORK_PROJECT = demoForkProject
+      }
+      env.IVAN_DEMO_FAKE_CREATE = demoFakeCreate ? 'true' : 'false'
+    }
     flags.push('--mcp-config "$AIVEN_MCP_CONFIG"')
   }
 

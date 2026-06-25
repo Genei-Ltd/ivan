@@ -9,6 +9,7 @@ import {
 import type { SessionLogger } from './logger'
 import type { SandboxResult } from './types'
 import { getAuthenticatedGitHubIdentity } from './github'
+import { installMcpProxy } from './mcp-proxy'
 import { getEnv } from '@/lib/env'
 import { installClaudeSkills } from './skill-installer'
 
@@ -97,6 +98,7 @@ async function installPsql(
 export async function createSandbox(
   branch: string,
   logger: SessionLogger,
+  opts: { databaseUrl?: string } = {},
 ): Promise<SandboxResult & { sandbox?: Sandbox }> {
   const env = getEnv()
   try {
@@ -162,6 +164,18 @@ export async function createSandbox(
       return { success: false, error: 'Failed to install Ivan skills', sandbox }
     }
 
+    // Trace mode or demo redirect: drop in the proxy that wraps mcp-aiven.
+    if (env.IVAN_MCP_TRACE === 'true' || env.IVAN_DEMO_FORK_NAME) {
+      const proxyReady = await installMcpProxy(sandbox, logger)
+      if (!proxyReady) {
+        return {
+          success: false,
+          error: 'Failed to install Aiven MCP proxy',
+          sandbox,
+        }
+      }
+    }
+
     // Postgres client so the agent can connect to an Aiven fork and run SQL.
     await installPsql(sandbox, logger)
 
@@ -195,7 +209,13 @@ export async function createSandbox(
     // The preview URL is needed before `next dev` starts so the target app can
     // accept the public sandbox host and hide dev-only browser chrome.
     const domain = sandbox.domain(env.SANDBOX_DEV_PORT)
-    await startDevServer(sandbox, packageManager, domain, logger)
+    await startDevServer(
+      sandbox,
+      packageManager,
+      domain,
+      logger,
+      opts.databaseUrl,
+    )
 
     await logger.success('Preview is live')
     return { success: true, sandbox, domain, branchName: branch }
@@ -213,6 +233,7 @@ async function startDevServer(
   packageManager: PackageManager,
   previewUrl: string,
   logger: SessionLogger,
+  databaseUrlOverride?: string,
 ): Promise<void> {
   const env = getEnv()
 
@@ -276,8 +297,11 @@ async function startDevServer(
   })
 
   const devEnv: Record<string, string> = {}
-  if (env.DATABASE_URL) {
-    devEnv.DATABASE_URL = env.DATABASE_URL
+  // Demo mode points the preview app at the pre-warmed fork; otherwise use the
+  // shell's own DATABASE_URL if configured.
+  const databaseUrl = databaseUrlOverride ?? env.DATABASE_URL
+  if (databaseUrl) {
+    devEnv.DATABASE_URL = databaseUrl
   }
 
   await sandbox.runCommand({

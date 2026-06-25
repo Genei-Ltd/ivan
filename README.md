@@ -40,6 +40,16 @@ Before booting a Next 16 target app, Ivan also adds the sandbox preview host to 
 
 Those runtime preview config edits are marked `assume-unchanged` inside the sandbox clone, then removed and unhidden before Ivan commits the agent's generated PR.
 
+### Demo mode
+
+A real Aiven fork takes ~5 minutes, longer than a 4-minute demo, so Ivan can't fork live on stage. Demo mode pre-warms one fork and makes the session resolve to it transparently. The in-sandbox agent still issues a real fork call and uses the Aiven MCP normally, but the MCP runs behind a proxy (`scripts/aiven-mcp-proxy.mjs`) that rewrites the agent's by-name calls (`pg_read`/`pg_write`, `connection_info`, `service_get`, metrics) onto the pre-warmed fork. The fork the agent thinks it made is always already live, with no special prompt and nothing for the agent to ignore. The preview app reads the same fork via `DATABASE_URL`, so migrations the agent runs show up live.
+
+Demo mode is implicit: it turns on once `IVAN_DEMO_FORK_URL` (the fork's Postgres URI, for the preview app) and `IVAN_DEMO_FORK_NAME` (its Aiven service name, for the proxy redirect) are both set, the env schema requires them together. Create the fork ahead of time with the `create-demo-fork` skill (`.claude/skills/create-demo-fork`). `aiven_service_create` passes through by default (a real throwaway fork, terminated via the skill's cleanup); set `IVAN_DEMO_FAKE_CREATE=true` to fake it instead so rehearsals leave nothing behind. Wiring lives in `src/lib/shell/demo.ts`, `mcp-proxy.ts`, and the proxy script.
+
+### MCP trace mode
+
+To capture the real Aiven JSON-RPC traffic (for designing or debugging the proxy redirect), set `IVAN_MCP_TRACE=true`. The Aiven MCP then runs behind the same proxy in log-only mode, appending every request/response to a trace file in the sandbox. Download it from `GET /api/sessions/<id>/mcp-trace` after a turn that used the Aiven MCP. The trace contains real connection credentials, so handle the download as a secret. (Demo mode also writes this trace, so a demo run can be inspected after the fact.)
+
 ## What's Included
 
 This template comes pre-configured with everything you need for modern Next.js development:

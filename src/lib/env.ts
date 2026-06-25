@@ -27,6 +27,34 @@ const schema = z.object({
   // a real Postgres. Optional until Phase 4.
   DATABASE_URL: z.string().optional(),
 
+  // ---- Demo mode ----
+  // Demo mode is implicit: it turns on as soon as a pre-warmed fork is supplied.
+  // A real Aiven fork takes ~5 min, longer than a 4-min demo, so we cannot fork
+  // on stage. The in-sandbox agent still issues a real fork call (so the audience
+  // sees it), but everything resolves to this already-live fork: the preview app
+  // reads it via DATABASE_URL, and the agent's Aiven MCP calls are redirected to
+  // it by the proxy. See src/lib/shell/demo.ts and the create-demo-fork skill.
+  //
+  // URL: the fork's Postgres connection string, injected as the preview app's
+  // DATABASE_URL. NAME/PROJECT: the fork's Aiven service identity, used by the
+  // proxy to redirect the agent's by-name MCP calls (pg_read/write, connection
+  // info, status, metrics) onto it. Both are required together.
+  IVAN_DEMO_FORK_URL: z.string().optional(),
+  IVAN_DEMO_FORK_NAME: z.string().optional(),
+  IVAN_DEMO_FORK_PROJECT: z.string().min(1).default('coloop'),
+  // When true, the proxy answers the agent's fork-create with a synthetic
+  // "RUNNING" result and never creates a real service, so rehearsals don't leave
+  // paid throwaway forks to clean up. Default false (a real fork is created and
+  // must be terminated via the create-demo-fork skill's cleanup).
+  IVAN_DEMO_FAKE_CREATE: z.enum(['true', 'false']).default('false'),
+
+  // ---- MCP trace mode ----
+  // When true, the in-sandbox Aiven MCP server runs behind a thin logging proxy
+  // that records every JSON-RPC request/response to a trace file in the sandbox,
+  // exfil'd via GET /api/sessions/:id/mcp-trace. Used to capture the real call
+  // shapes (fork create, status, connection string, SQL) before faking them.
+  IVAN_MCP_TRACE: z.enum(['true', 'false']).default('false'),
+
   // Aiven API token. Gives the in-sandbox agent the Aiven MCP server (via
   // `npx mcp-aiven`) so it can provision and inspect Aiven services live.
   // Create one in the Aiven Console; needs org-level "Allow MCP connection".
@@ -47,6 +75,22 @@ const schema = z.object({
     .default(30 * 60 * 1000),
 })
 
+// Demo needs both the connection URL (for the preview app) and the service
+// name (for the MCP proxy redirect). Setting one without the other is a
+// misconfiguration that would half-wire the demo, so fail fast.
+const schemaWithChecks = schema.superRefine((value, ctx) => {
+  const hasUrl = Boolean(value.IVAN_DEMO_FORK_URL)
+  const hasName = Boolean(value.IVAN_DEMO_FORK_NAME)
+  if (hasUrl !== hasName) {
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'Demo mode needs both IVAN_DEMO_FORK_URL and IVAN_DEMO_FORK_NAME set together.',
+      path: [hasUrl ? 'IVAN_DEMO_FORK_NAME' : 'IVAN_DEMO_FORK_URL'],
+    })
+  }
+})
+
 export type Env = z.infer<typeof schema>
 
 let cached: Env | null = null
@@ -55,7 +99,7 @@ export function getEnv(): Env {
   if (cached) {
     return cached
   }
-  const parsed = schema.safeParse(process.env)
+  const parsed = schemaWithChecks.safeParse(process.env)
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `${i.path.join('.')}: ${i.message}`)

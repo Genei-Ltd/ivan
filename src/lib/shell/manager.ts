@@ -16,6 +16,12 @@ import {
 } from './store'
 import { createSessionLogger } from './logger'
 import { branchNameFromPrompt } from './branch'
+import {
+  demoFakeCreate,
+  demoForkName,
+  demoForkProject,
+  demoForkUrl,
+} from './demo'
 import { createSandbox } from './creation'
 import { executeClaudeInSandbox } from './agent'
 import { pushChangesToBranch } from './git'
@@ -75,7 +81,10 @@ async function provisionAndRun(
     return
   }
 
-  const result = await createSandbox(session.branch, logger)
+  // Demo mode: run the preview app against the pre-warmed fork (no-op otherwise).
+  const result = await createSandbox(session.branch, logger, {
+    databaseUrl: demoForkUrl(),
+  })
   if (result.sandbox) {
     setSandbox(id, result.sandbox)
     // The sandbox starts with the base timeout; track its deadline so the
@@ -117,6 +126,8 @@ async function runAgentTurn(
   const assistantId = randomUUID()
   setMessage(id, { id: assistantId, role: 'assistant', content: '' })
 
+  // Demo mode: the proxy redirects the agent's by-name Aiven MCP calls onto the
+  // pre-warmed fork (demoForkName). Undefined/absent outside demo mode.
   const result = await executeClaudeInSandbox(sandbox, instruction, {
     sessionId: id,
     model: env.AGENT_MODEL,
@@ -127,6 +138,10 @@ async function runAgentTurn(
     aivenToken: env.AIVEN_TOKEN,
     aivenReadOnly: env.AIVEN_READ_ONLY === 'true',
     aivenAllowSecrets: env.AIVEN_ALLOW_SECRETS === 'true',
+    demoForkName: demoForkName(),
+    demoForkProject: demoForkProject(),
+    demoFakeCreate: demoFakeCreate(),
+    traceMcp: env.IVAN_MCP_TRACE === 'true',
     logger,
     onAssistantUpdate: ({ content, parts }) => {
       setMessage(id, { id: assistantId, role: 'assistant', content, parts })

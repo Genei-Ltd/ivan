@@ -46,3 +46,6 @@ yarn.lock
 
 # vibes
 repomix*.xml
+
+# captured MCP traces (contain credentials)
+aiven-mcp-trace*.jsonl

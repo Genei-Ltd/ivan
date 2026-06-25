@@ -35,7 +35,10 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 
   outputFileTracingIncludes: {
-    '/api/**/*': ['./src/lib/shell/claude-skills/**/*'],
+    '/api/**/*': [
+      './src/lib/shell/claude-skills/**/*',
+      './scripts/aiven-mcp-proxy.mjs',
+    ],
   },
 
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
